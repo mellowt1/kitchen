@@ -2,9 +2,12 @@
 //   npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 
-const L = createRequire(import.meta.url)('../app/logic.js');
+// logic.js is a plain browser script that sets self.KitchenLogic; run it the way the page does.
+const holder = {};
+new Function('self', readFileSync(new URL('../app/logic.js', import.meta.url), 'utf8'))(holder);
+const L = holder.KitchenLogic;
 
 test('dough: 4 pizzas of 14 inch, regular, matches the old artifact', () => {
   const d = L.doughCalc({ size: 14, count: 4, thickness: 'regular', gf: false, tweaks: {} });
