@@ -108,7 +108,8 @@ a:hover { color: #2C4F29; }
 
 /* ---------- Shopping ---------- */
 .shop-head { flex-wrap: wrap; }
-.left { font-size: 15px; color: var(--muted); padding-bottom: 6px; }
+.shop-side { display: flex; align-items: center; gap: 10px; }
+.left { font-size: 15px; color: var(--muted); white-space: nowrap; }
 .add {
   flex-basis: 100%; display: flex; gap: 8px; align-items: center; padding: 5px 5px 5px 16px;
   background: var(--card); border: 1px solid var(--rule); border-radius: 999px; margin-top: -2px;

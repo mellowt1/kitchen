@@ -338,7 +338,7 @@
   function renderShop() {
     const week = weekAt(weekOffset);
     const list = L.shoppingList(week, db);
-    $('shopWeek').textContent = 'Week ' + weekNum(week);
+    $('shopWeek').textContent = 'Week ' + weekNum(week) + (weekOffset === 1 ? ', next week' : weekOffset === -1 ? ', last week' : '');
     $('shopLeft').textContent = list.total ? list.left + ' left' : '';
     $('shopLeftWide').textContent = list.total ? list.left + ' left' : 'Week ' + weekNum(week);
     $('untickAll').hidden = list.left === list.total;
@@ -814,6 +814,9 @@
   $('prevWeek').addEventListener('click', () => { weekOffset--; renderWeek(); renderShop(); });
   $('nextWeek').addEventListener('click', () => { weekOffset++; renderWeek(); renderShop(); });
   $('thisWeek').addEventListener('click', () => { weekOffset = 0; renderWeek(); renderShop(); });
+  // The shopping list follows the same week as the Week tab.
+  $('shopPrev').addEventListener('click', () => { weekOffset--; renderWeek(); renderShop(); });
+  $('shopNext').addEventListener('click', () => { weekOffset++; renderWeek(); renderShop(); });
   $('days').addEventListener('click', (e) => {
     const b = e.target.closest('[data-day]');
     if (b) openDaySheet(b.dataset.day);

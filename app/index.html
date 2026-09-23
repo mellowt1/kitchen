@@ -74,7 +74,13 @@
             <span class="label"><span class="only-phone" id="shopWeek"></span><span class="only-wide" id="shopLeftWide"></span></span>
             <h1 class="h1">Shopping</h1>
           </div>
-          <span class="left only-phone" id="shopLeft"></span>
+          <div class="shop-side only-phone">
+            <span class="left" id="shopLeft"></span>
+            <div class="arrows">
+              <button type="button" class="round" id="shopPrev" aria-label="Previous week">‹</button>
+              <button type="button" class="round" id="shopNext" aria-label="Next week">›</button>
+            </div>
+          </div>
           <form id="addForm" class="add" autocomplete="off">
             <label for="addInput" class="sr">Add an item</label>
             <input id="addInput" placeholder="Add an item" maxlength="200" enterkeyhint="done">
