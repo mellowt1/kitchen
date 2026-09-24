@@ -64,3 +64,19 @@ npm run icons                     # redraws app/icons/
 ```
 
 On localhost the page talks to `http://localhost:8787` and skips the service worker (add `&sw=1` to test it). Only ever use made up dev values locally.
+
+## Claude Desktop (recipes by chat, on the PC)
+
+`mcp/server.mjs` gives Claude Desktop eight kitchen tools: list, get, save and delete recipes, see the week, plan or clear a day, and add to the shopping list. It uses the kitchen code, like the app, so it can only touch the kitchen.
+
+Set up once: `cd mcp; npm install`, then add this to Claude Desktop's config (Settings, Developer, Edit Config) and restart Claude Desktop:
+
+```json
+"kitchen": {
+  "command": "node",
+  "args": ["C:/Users/Admin/Desktop/PAUL AGENTS/kitchen/mcp/server.mjs"],
+  "env": { "KITCHEN_SECRETS": "C:/Users/Admin/Desktop/PAUL AGENTS/todo/secrets.local.txt" }
+}
+```
+
+The code is read from that gitignored secrets file (its `KITCHEN_CODE` line) and never goes into the config. Then just say "Add this recipe: ..." with a link or notes.
