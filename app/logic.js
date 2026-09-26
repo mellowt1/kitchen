@@ -126,6 +126,16 @@
     return w.week + ':' + w.day;
   }
 
+  /* ---------- Whose plan, which meal (the Worker has the same keys) ---------- */
+  // A day record is one meal of one person: '<YYYY-Www>:<mon..sun>:<person>:<meal>'.
+  // The old '<YYYY-Www>:<mon..sun>' was a dinner for both; the page turns it into two.
+  const PEOPLE = ['paul', 'olivia'];
+  const PERSON_NAME = { paul: 'Paul', olivia: 'Olivia' };
+  const MEALS = ['breakfast', 'lunch', 'dinner'];
+  const MEAL_NAME = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
+  const mealId = (dayId, who, meal) => dayId + ':' + who + ':' + meal;
+  const isOldDayId = (id) => id.split(':').length === 2;
+
   /* ---------- Dough ---------- */
   const TF = { thin: 2.0345, regular: 2.3873, thick: 3.1135 }; // grams per square inch
   const BASE = { water: 62, yeast: 0.4, salt: 2.5, sugar: 2, oil: 3.3 }; // baker's percentages
@@ -332,14 +342,31 @@
    *   week     'YYYY-Www'
    *   byKey    { 'recipe:<id>': recipe, 'day:<id>': day, 'extra:<id>': extra, 'tick:<id>': tick }
    * -> { groups: [{ aisle, name, lines: [{ key, name, qty, on, extraId }] }], left, total } */
+  // Every planned recipe of the week, both plans, every meal. The same recipe for the same
+  // meal in both plans is one pot, cooked once, at the larger of the two servings.
+  function plannedRecipes(week, byKey) {
+    const out = [];
+    for (const d of weekDays(week)) {
+      for (const meal of MEALS) {
+        const pots = new Map(); // recipeId -> servings (null: the recipe's own)
+        for (const who of PEOPLE) {
+          const rec = byKey['day:' + mealId(d.id, who, meal)];
+          if (!rec || rec.kind !== 'recipe') continue;
+          const r = byKey['recipe:' + rec.recipeId];
+          if (!r) continue;
+          const srv = rec.servings || r.servings;
+          pots.set(r.id, Math.max(pots.get(r.id) || 0, srv));
+        }
+        for (const [id, servings] of pots) out.push({ recipe: byKey['recipe:' + id], servings });
+      }
+    }
+    return out;
+  }
+
   function shoppingList(week, byKey) {
     const lines = new Map();
-    for (const d of weekDays(week)) {
-      const day = byKey['day:' + d.id];
-      if (!day || day.kind !== 'recipe') continue;
-      const r = byKey['recipe:' + day.recipeId];
-      if (!r) continue;
-      const factor = day.servings && r.servings ? day.servings / r.servings : 1;
+    for (const { recipe: r, servings } of plannedRecipes(week, byKey)) {
+      const factor = servings && r.servings ? servings / r.servings : 1;
       for (const g of r.ingredients || []) {
         const key = 'i:' + itemKey(g.item);
         let l = lines.get(key);
@@ -373,6 +400,7 @@
   const api = {
     AISLES, AISLE_KEYS, AISLE_NAME, guessAisle, cleanLine,
     WEEKDAYS, DAY_NAMES, MONTHS, localDate, addDays, daysBetween, isoWeek, weekStart, weekDays, dayName, dayMonth, longDate, weekRange, dateOfDayId, dayIdOf,
+    PEOPLE, PERSON_NAME, MEALS, MEAL_NAME, mealId, isOldDayId, plannedRecipes,
     TF, BASE, GF, RES, DOUGH_DEFAULT, TWEAK_STEP, TWEAK_RANGE, doughCalc, grams, ballGrams, pctText, STEPS_NY, STEPS_GF, bakeNote,
     MIX_DAYS, mixDate, pizzaPlan, mixDueToday,
     parseQty, normUnit, amountText, scale, itemKey, itemName, sumText, shoppingList,

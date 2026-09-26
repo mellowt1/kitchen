@@ -42,5 +42,14 @@ The dough base comes from the old artifact: 62% water, 0.4% active dry yeast, 2.
 - No dashes used as punctuation in any text.
 - The design is made on a Claude Design canvas, and Paul approves it before the build starts.
 
+## Two plans (added 26 Sept 2026)
+- Week has a Paul / Olivia switch. Each has their own plan, with breakfast, lunch and dinner per day; dinners can differ. When they eat the same, they plan the same in both (the day sheet has "Same for Olivia" / "Same for Paul").
+- Dinner always shows; breakfast and lunch show only once one is planned.
+- Shopping adds up both plans and every meal. The same recipe for the same meal in both plans is one pot, counted once at the larger servings.
+- A day record is one meal of one person: `<YYYY-Www>:<mon..sun>:<paul|olivia>:<breakfast|lunch|dinner>`. The page turns an old shared day into a dinner for each.
+- The Morning Screen shows Paul's dinner. A pizza night in either plan sets the mix day.
+- Olivia's link ends in `&p=olivia`, so her phone opens on her plan.
+- Design: option A on the canvas https://claude.ai/artifact/MsaTHvYmPWUNa87HBAe1kq
+
 ## Open
 - How the girlfriend gets the link: Paul sends it to her himself (a QR and the link go in a gitignored local file).

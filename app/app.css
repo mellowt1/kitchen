@@ -87,8 +87,11 @@ a:hover { color: #2C4F29; }
 /* ---------- Week ---------- */
 .banner { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--tomato-bg); color: var(--tomato-ink); font-size: 15px; line-height: 1.35; }
 .banner b { font-weight: 700; }
+.seg.who { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.seg.meals { margin: 0; }
+.seg .dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 999px; background: var(--tomato); vertical-align: middle; }
 .day {
-  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; align-items: center;
   width: 100%; min-height: 62px; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--row);
   background: var(--card); text-align: left;
 }
@@ -98,13 +101,17 @@ a:hover { color: #2C4F29; }
 .day-when b { font-size: 15px; font-weight: 700; }
 .day.today .day-when b { color: var(--tomato); }
 .day-when span { font-size: 13px; color: var(--muted2); }
-.day-what { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.day-what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* One line per meal: the meal's name, what it is, servings. Dinner is the big one. */
+.meal { display: grid; grid-template-columns: 66px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; }
+.meal-what { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.meal-name { font-size: 13px; color: var(--muted2); white-space: nowrap; }
 .day-title { font-size: 17px; overflow-wrap: anywhere; }
+.meal:not(.meal-dinner) .day-title { font-size: 15px; color: var(--muted); }
 .day-title.empty { color: var(--faint); }
 .day-title.pizza { color: var(--tomato); font-family: var(--serif); }
 .day-title.gone { color: var(--muted2); font-style: italic; }
 .day-side { font-size: 13px; color: var(--muted2); white-space: nowrap; }
-.day-side .pillv { display: none; }
 
 /* ---------- Shopping ---------- */
 .shop-head { flex-wrap: wrap; }
@@ -299,11 +306,9 @@ a:hover { color: #2C4F29; }
   .plan .h1 { font-size: 34px; }
   .plan .round { width: 40px; height: 40px; }
   .banner { padding: 11px 14px; }
-  .day { grid-template-columns: 70px minmax(0, 1fr) auto; min-height: 58px; padding: 8px 18px; }
+  .day { grid-template-columns: 70px minmax(0, 1fr); min-height: 58px; padding: 8px 18px; }
   .day-when { flex-direction: row; gap: 5px; align-items: baseline; font-size: 15px; }
   .day-when span { font-size: 15px; }
-  .day-what .pillv { display: none; }
-  .day-side .pillv { display: inline-block; font-size: 12px; padding: 2px 9px; }
   .day-side .srv { display: none; }
 
   .shop-head { flex-wrap: nowrap; }

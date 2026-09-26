@@ -55,8 +55,12 @@
   $('app').hidden = false;
 
   const KEY = 'kitchen.v1.' + code;
-  const ui = Object.assign({ tab: 'week', vegOnly: false }, store.get('kitchen.ui') || {});
+  const ui = Object.assign({ tab: 'week', vegOnly: false, who: 'paul' }, store.get('kitchen.ui') || {});
   const saveUi = () => store.set('kitchen.ui', ui);
+  // Whose plan the Week shows. Olivia's link carries &p=olivia, so her phone opens on hers.
+  const askedWho = params.get('p');
+  if (L.PEOPLE.includes(askedWho)) { ui.who = askedWho; saveUi(); }
+  if (!L.PEOPLE.includes(ui.who)) ui.who = 'paul';
   const saved = store.get(KEY);
   const st = saved && typeof saved === 'object'
     ? { server: saved.server || {}, rev: saved.rev || 0, queue: Array.isArray(saved.queue) ? saved.queue : [] }
@@ -143,9 +147,10 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const VEG = '<span class="pillv">Vegetarian</span>';
 
+  // One meal of one person: '<week>:<day>:<who>:<meal>'.
   function dayView(id) {
     const rec = dayRec(id);
-    if (!rec) return { title: 'Add dinner', cls: 'empty', side: '' };
+    if (!rec) return { title: 'Add ' + id.split(':')[3], cls: 'empty', side: '' };
     if (rec.kind === 'pizza') {
       const n = rec.servings || dough().count;
       return { title: 'Pizza night', cls: 'pizza', side: plural(n, 'pizza', 'pizzas') };
@@ -192,13 +197,23 @@
     $('weekLabel').innerHTML = `Week ${weekNum(week)}<span class="only-wide">, ${esc(L.weekRange(week))}</span>`;
     $('weekTitle').textContent = weekOffset === 0 ? 'This week' : weekOffset === 1 ? 'Next week' : weekOffset === -1 ? 'Last week' : L.weekRange(week);
     $('thisWeek').hidden = weekOffset === 0;
+    for (const b of document.querySelectorAll('[data-who]')) b.setAttribute('aria-checked', String(b.dataset.who === ui.who));
+    // Dinner always shows; breakfast and lunch only once one is planned.
     $('days').innerHTML = L.weekDays(week).map((d) => {
-      const v = dayView(d.id);
       const isToday = d.date === t;
-      return `<button type="button" class="day${isToday ? ' today' : ''}" data-day="${d.id}"${isToday ? ' aria-current="date"' : ''} aria-label="${esc(d.name + ' ' + d.dayNum + ': ' + v.title)}">`
+      const meals = L.MEALS.filter((m) => m === 'dinner' || dayRec(L.mealId(d.id, ui.who, m)));
+      // A day with only dinner reads like before; the names show once there is more.
+      const named = meals.length > 1;
+      const lines = meals.map((m) => {
+        const v = dayView(L.mealId(d.id, ui.who, m));
+        return `<span class="meal meal-${m}"><span class="meal-name">${named ? L.MEAL_NAME[m] : ''}</span>`
+          + `<span class="meal-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(v.title)}</span>${v.veg ? VEG : ''}</span>`
+          + `<span class="day-side"><span class="srv">${esc(v.side)}</span></span></span>`;
+      });
+      const said = meals.map((m) => L.MEAL_NAME[m] + ' ' + dayView(L.mealId(d.id, ui.who, m)).title).join(', ');
+      return `<button type="button" class="day${isToday ? ' today' : ''}" data-day="${d.id}"${isToday ? ' aria-current="date"' : ''} aria-label="${esc(d.name + ' ' + d.dayNum + ': ' + said)}">`
         + `<span class="day-when"><b>${d.short}</b><span>${d.dayNum}</span></span>`
-        + `<span class="day-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(v.title)}</span>${v.veg ? VEG : ''}</span>`
-        + `<span class="day-side"><span class="srv">${esc(v.side)}</span>${v.veg ? VEG : ''}</span>`
+        + `<span class="day-what">${lines.join('')}</span>`
         + '</button>';
     }).join('');
     const due = L.mixDueToday(pizzaNights(), dough().gf, t);
@@ -235,21 +250,46 @@
     return list.map((r) => `<button type="button" class="pick${r.id === curId ? ' cur' : ''}" data-pick="${r.id}"><span>${esc(r.title)}</span>${r.veg ? VEG : r.time ? `<small>${esc(r.time)}</small>` : ''}</button>`).join('');
   }
 
-  function openDaySheet(id) {
+  const PLACEHOLDER = { breakfast: 'Overnight oats, toast', lunch: 'Leftovers, a sandwich', dinner: 'Leftovers, dinner at friends' };
+  const otherOf = (who) => L.PEOPLE.find((p) => p !== who);
+
+  // The sheet for one meal of the person whose plan is on screen; the meal row switches meals.
+  function daySheetHtml(day, meal) {
+    const who = ui.who;
+    const id = L.mealId(day, who, meal);
     const rec = dayRec(id);
-    const date = L.dateOfDayId(id);
+    const date = L.dateOfDayId(day);
     const r = rec && rec.kind === 'recipe' ? recipe(rec.recipeId) : null;
-    const servings = (rec && rec.servings) || (r && r.servings) || (rec && rec.kind === 'pizza' ? dough().count : 2);
+    const servings = (rec && rec.servings) || (r && r.servings) || (rec && rec.kind === 'pizza' ? dough().count : meal === 'dinner' ? 2 : 1);
     const many = recipes().length;
-    const html = sheetHead(L.dayName(date), L.dayMonth(date))
+    const other = otherOf(who);
+    const html = sheetHead(`${L.PERSON_NAME[who]}, ${L.dayName(date)}`, L.dayMonth(date))
+      + `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-meal="${m}" aria-checked="${m === meal}">${L.MEAL_NAME[m]}${m !== meal && dayRec(L.mealId(day, who, m)) ? '<span class="dot" aria-label=", planned"></span>' : ''}</button>`).join('')}</div>`
       + `<div class="set-row"><span id="srvLabel">${rec && rec.kind === 'pizza' ? 'Pizzas' : 'Servings'}</span><div class="stepper"><button type="button" data-srv="-1" aria-label="Fewer">−</button><span id="srvVal">${servings}</span><button type="button" data-srv="1" aria-label="More">+</button></div></div>`
       + '<span class="label">Write it</span>'
-      + `<form class="write" id="writeForm" autocomplete="off"><label class="sr" for="writeInput">Dinner</label><input id="writeInput" maxlength="200" enterkeyhint="done" placeholder="Leftovers, dinner at friends" value="${rec && rec.kind === 'text' ? esc(rec.text) : ''}"><button type="submit" class="btn btn-red">Save</button></form>`
+      + `<form class="write" id="writeForm" autocomplete="off"><label class="sr" for="writeInput">${L.MEAL_NAME[meal]}</label><input id="writeInput" maxlength="200" enterkeyhint="done" placeholder="${PLACEHOLDER[meal]}" value="${rec && rec.kind === 'text' ? esc(rec.text) : ''}"><button type="submit" class="btn btn-red">Save</button></form>`
       + '<span class="label">Or pick a recipe</span>'
       + (many > 6 ? '<label class="sr" for="pickFind">Find a recipe</label><input id="pickFind" class="find" type="search" placeholder="Find a recipe" autocomplete="off">' : '')
       + `<div class="card picks" id="picks">${pickListHtml(r && r.id)}</div>`
-      + `<div class="sheet-actions"><button type="button" class="btn btn-soft" data-act="pizza">Pizza night</button>${rec ? '<button type="button" class="btn btn-line" data-act="clear">Clear the day</button>' : ''}</div>`;
-    openSheet({ kind: 'day', id, servings, touched: false }, html);
+      + '<div class="sheet-actions">'
+      + (meal === 'dinner' ? '<button type="button" class="btn btn-soft" data-act="pizza">Pizza night</button>' : '')
+      + (rec ? `<button type="button" class="btn btn-line" data-act="copy">Same for ${L.PERSON_NAME[other]}</button>` : '')
+      + (rec ? `<button type="button" class="btn btn-line" data-act="clear">Clear ${meal}</button>` : '')
+      + '</div>';
+    return { html, state: { kind: 'day', day, meal, id, servings, touched: false } };
+  }
+
+  function openDaySheet(day, meal = 'dinner') {
+    const v = daySheetHtml(day, meal);
+    openSheet(v.state, v.html);
+  }
+
+  function switchMeal(meal) {
+    const v = daySheetHtml(sheet.day, meal);
+    sheet = v.state;
+    $('sheetBody').innerHTML = v.html;
+    const b = $('sheetBody').querySelector(`[data-meal="${meal}"]`);
+    if (b) b.focus({ preventScroll: true });
   }
 
   function saveDay(id, fields) {
@@ -261,6 +301,8 @@
   function daySheetAction(e) {
     const s = sheet;
     const rec = dayRec(s.id);
+    const mealBtn = e.target.closest('[data-meal]');
+    if (mealBtn) { if (mealBtn.dataset.meal !== s.meal) switchMeal(mealBtn.dataset.meal); return; }
     const srv = e.target.closest('[data-srv]');
     if (srv) {
       s.servings = Math.min(50, Math.max(1, s.servings + Number(srv.dataset.srv)));
@@ -280,12 +322,18 @@
     if (act.dataset.act === 'pizza') {
       saveDay(s.id, { kind: 'pizza', servings: s.touched || (rec && rec.kind === 'pizza') ? s.servings : dough().count });
       closeSheet();
+    } else if (act.dataset.act === 'copy' && rec) {
+      const other = otherOf(ui.who);
+      const id = L.mealId(s.day, other, s.meal);
+      const prev = saveDay(id, { kind: rec.kind, recipeId: rec.recipeId || null, text: rec.text || '', servings: rec.servings || null });
+      closeSheet();
+      toast(`Copied to ${L.PERSON_NAME[other]}'s ${s.meal}.`, () => restore('day', id, prev));
     } else if (act.dataset.act === 'clear') {
       const prev = rec;
       const id = s.id;
       drop('day', id);
       closeSheet();
-      toast(`Cleared ${L.dayName(L.dateOfDayId(id))}.`, () => restore('day', id, prev));
+      toast(`Cleared ${L.dayName(L.dateOfDayId(id))}'s ${s.meal}.`, () => restore('day', id, prev));
     }
   }
 
@@ -305,16 +353,20 @@
     const r = recipe(s.recipeId);
     const week = weekAt(s.offset);
     const t = today();
+    const whoList = ['both', ...L.PEOPLE];
+    const shown = s.who === 'both' ? ui.who : s.who; // whose plan the free or taken days show
     return sheetHead('Plan it', r ? r.title : '')
+      + `<div class="seg" role="radiogroup" aria-label="For">${whoList.map((w) => `<button type="button" role="radio" data-pwho="${w}" aria-checked="${w === s.who}">${w === 'both' ? 'Both' : L.PERSON_NAME[w]}</button>`).join('')}</div>`
+      + `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-pmeal="${m}" aria-checked="${m === s.meal}">${L.MEAL_NAME[m]}</button>`).join('')}</div>`
       + `<div class="head"><span class="label">Week ${weekNum(week)}, ${esc(L.weekRange(week))}</span><div class="arrows"><button type="button" class="round" data-pweek="-1" aria-label="Previous week">‹</button><button type="button" class="round" data-pweek="1" aria-label="Next week">›</button></div></div>`
       + '<div class="card">' + L.weekDays(week).map((d) => {
-        const v = dayView(d.id);
+        const v = dayView(L.mealId(d.id, shown, s.meal));
         return `<button type="button" class="planday${d.date === t ? ' today' : ''}" data-plan="${d.id}"><span class="day-when"><b>${d.short}</b><span>${d.dayNum}</span></span><span class="now${v.cls === 'empty' ? ' empty' : ''}">${esc(v.cls === 'empty' ? 'Free' : v.title)}</span></button>`;
       }).join('') + '</div>';
   }
 
   function openPlanSheet(recipeId, servings) {
-    openSheet({ kind: 'plan', recipeId, servings, offset: weekOffset }, '');
+    openSheet({ kind: 'plan', recipeId, servings, offset: weekOffset, who: 'both', meal: 'dinner' }, '');
     $('sheetBody').innerHTML = planSheetHtml();
   }
 
@@ -326,12 +378,26 @@
       $('sheetBody').innerHTML = planSheetHtml();
       return;
     }
+    const pick = e.target.closest('[data-pwho], [data-pmeal]');
+    if (pick) {
+      if (pick.dataset.pwho) s.who = pick.dataset.pwho;
+      else s.meal = pick.dataset.pmeal;
+      $('sheetBody').innerHTML = planSheetHtml();
+      return;
+    }
     const pd = e.target.closest('[data-plan]');
     if (!pd) return;
-    const id = pd.dataset.plan;
-    const prev = saveDay(id, { kind: 'recipe', recipeId: s.recipeId, servings: s.servings });
+    const day = pd.dataset.plan;
     closeSheet();
-    toast(`Planned for ${L.longDate(L.dateOfDayId(id))}.`, () => restore('day', id, prev));
+    planFor(day, s.who === 'both' ? L.PEOPLE : [s.who], s.meal, { kind: 'recipe', recipeId: s.recipeId, servings: s.servings },
+      `Planned for ${L.longDate(L.dateOfDayId(day))}.`);
+  }
+
+  // Put the same meal in one or both plans, with one Undo for all of it.
+  function planFor(day, people, meal, fields, said) {
+    const prev = people.map((p) => [L.mealId(day, p, meal), dayRec(L.mealId(day, p, meal))]);
+    enqueue(prev.map(([id]) => upsertOp('day', Object.assign({ id, recipeId: null, text: '', servings: null }, fields))));
+    toast(said, () => enqueue(prev.map(([id, was]) => was ? upsertOp('day', was) : deleteOp('day', id))));
   }
 
   /* ---------- Shopping ---------- */
@@ -635,9 +701,7 @@
   function addNightToWeek() {
     const s = dough();
     if (!s.night) return;
-    const id = L.dayIdOf(s.night);
-    const prev = saveDay(id, { kind: 'pizza', servings: s.count });
-    toast(`Pizza night is on ${L.longDate(s.night)}.`, () => restore('day', id, prev));
+    planFor(L.dayIdOf(s.night), L.PEOPLE, 'dinner', { kind: 'pizza', servings: s.count }, `Pizza night is on ${L.longDate(s.night)}.`);
   }
 
   function addNightToShopping() {
@@ -750,7 +814,27 @@
     }
     save();
     computeView();
-    renderAll();
+    if (!splitOldDays()) renderAll();
+  }
+
+  // Before each had a plan, a day was one dinner for both ('<week>:<day>'). Give each of
+  // them that dinner, unless they already planned their own, and remove the old record.
+  // A phone still on the old page may write one more; the next sync splits that too.
+  function splitOldDays() {
+    const ops = [];
+    for (const r of Object.values(db)) {
+      if (r.type !== 'day' || !L.isOldDayId(r.id)) continue;
+      for (const p of L.PEOPLE) {
+        const id = L.mealId(r.id, p, 'dinner');
+        const mine = dayRec(id);
+        if (!mine || (mine.updatedAt || 0) < (r.updatedAt || 0)) {
+          ops.push(upsertOp('day', { id, kind: r.kind, recipeId: r.recipeId || null, text: r.text || '', servings: r.servings || null }));
+        }
+      }
+      ops.push(deleteOp('day', r.id));
+    }
+    if (ops.length) enqueue(ops);
+    return ops.length > 0;
   }
 
   async function poll() {
@@ -817,6 +901,13 @@
   // The shopping list follows the same week as the Week tab.
   $('shopPrev').addEventListener('click', () => { weekOffset--; renderWeek(); renderShop(); });
   $('shopNext').addEventListener('click', () => { weekOffset++; renderWeek(); renderShop(); });
+  $('whoSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-who]');
+    if (!b || b.dataset.who === ui.who) return;
+    ui.who = b.dataset.who;
+    saveUi();
+    renderWeek();
+  });
   $('days').addEventListener('click', (e) => {
     const b = e.target.closest('[data-day]');
     if (b) openDaySheet(b.dataset.day);
@@ -907,7 +998,7 @@
   window.addEventListener('offline', () => setNet('offline'));
 
   computeView();
-  renderAll();
+  if (!splitOldDays()) renderAll();
   if (!navigator.onLine) setNet('offline');
   poll();
   if (st.queue.length) scheduleFlush(300);

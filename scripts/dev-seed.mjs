@@ -88,13 +88,21 @@ export async function seed() {
   const up = (type, item) => ({ op: 'upsert', type, item: { ...item, updatedAt: now } });
   const del = (type, id) => ({ op: 'delete', type, item: { id, updatedAt: now } });
   const ops = [
+    // Monday is an old shared dinner, so the page's split is seen working.
     up('day', { id: `${week}:mon`, kind: 'recipe', recipeId: 'devnorma0001', servings: 2 }),
-    up('day', { id: `${week}:tue`, kind: 'recipe', recipeId: 'devcurry0001', servings: 4 }),
-    up('day', { id: `${week}:wed`, kind: 'text', text: 'Leftover curry', servings: 2 }),
-    del('day', `${week}:thu`),
-    up('day', { id: `${week}:fri`, kind: 'text', text: 'Dinner at friends' }),
-    up('day', { id: `${week}:sat`, kind: 'pizza', servings: 4 }),
-    del('day', `${week}:sun`),
+    ...['paul', 'olivia'].flatMap((p) => ['breakfast', 'lunch', 'dinner'].flatMap((m) => ['mon', 'thu', 'sun'].map((d) => del('day', `${week}:${d}:${p}:${m}`)))),
+    ...['tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => del('day', `${week}:${d}`)),
+    up('day', { id: `${week}:tue:paul:dinner`, kind: 'recipe', recipeId: 'devcurry0001', servings: 4 }),
+    up('day', { id: `${week}:tue:olivia:dinner`, kind: 'recipe', recipeId: 'devcurry0001', servings: 4 }),
+    up('day', { id: `${week}:wed:paul:breakfast`, kind: 'text', text: 'Overnight oats' }),
+    up('day', { id: `${week}:wed:paul:lunch`, kind: 'text', text: 'Leftover curry' }),
+    up('day', { id: `${week}:wed:paul:dinner`, kind: 'text', text: 'Leftover curry', servings: 2 }),
+    up('day', { id: `${week}:wed:olivia:lunch`, kind: 'text', text: 'Salad at work' }),
+    up('day', { id: `${week}:wed:olivia:dinner`, kind: 'text', text: 'Dinner with Anna' }),
+    up('day', { id: `${week}:fri:paul:dinner`, kind: 'text', text: 'Dinner at friends' }),
+    up('day', { id: `${week}:fri:olivia:dinner`, kind: 'text', text: 'Dinner at friends' }),
+    up('day', { id: `${week}:sat:paul:dinner`, kind: 'pizza', servings: 4 }),
+    up('day', { id: `${week}:sat:olivia:dinner`, kind: 'pizza', servings: 4 }),
     up('dough', { id: 'dough', size: 14, count: 4, thickness: 'regular', gf: false, night: sat, tweaks: {} }),
     up('extra', { id: 'devflour0001', week, text: 'Bread flour', qty: '870 g', aisle: 'baking' }),
     up('extra', { id: 'devyeast0001', week, text: 'Active dry yeast', qty: '3.5 g', aisle: 'baking' }),

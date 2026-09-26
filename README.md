@@ -1,6 +1,6 @@
 # Kitchen
 
-The week's dinners, the recipes, one shopping list and Paul's New York pizza dough, shared by Paul and his girlfriend. Plan a dinner on one phone and it shows on the other within about ten seconds. Tick things off in the shop without signal; the ticks sync when you are back online.
+A week plan each (breakfast, lunch and dinner), the recipes, one shopping list and Paul's New York pizza dough, shared by Paul and Olivia. Plan a meal on one phone and it shows on the other within about ten seconds. Tick things off in the shop without signal; the ticks sync when you are back online.
 
 **No recipes or plans live in this repo.** The page ships empty and loads everything from the `paul-hub` Worker with the code in the link, so the repo can be public.
 
@@ -16,13 +16,13 @@ The kitchen has its **own** code (`KITCHEN_CODE` in the Worker), not the to-do's
 
 Open the link in Safari, tap Share, then **Add to Home Screen**. It opens full screen with the pizza icon and works offline: the last copy and any changes are kept on the phone.
 
-**Sharing with your girlfriend:** send her the same link (a message or a QR). She needs no account. Keep your own copy of the link and QR in a `my-link.local.txt` / `.png` next to this README; `*.local.*` files are never committed.
+**Sharing with Olivia:** send her the same link with `&p=olivia` on the end, so her phone opens on her plan (a message or a QR). She needs no account. The switch at the top of Week changes plans any time, and each phone remembers its choice. Keep your own copy of the link and QR in a `my-link.local.txt` / `.png` next to this README; `*.local.*` files are never committed.
 
 ## The four tabs
 
-* **Week**: Monday to Sunday. Tap a day to pick a recipe, write something ("Dinner at friends"), set servings, make it pizza night, or clear it. On mix day a banner says "Mix the dough today".
-* **Recipes**: the cookbook, with a Vegetarian label and a "Vegetarian only" filter. The servings stepper scales the amounts. Plan it puts it on a day. Add or edit by hand; the aisle is guessed from the item's name.
-* **Shopping**: this week's planned recipes, added up per item and scaled by servings, plus your own items, in supermarket order. Tick, untick all, remove your own items.
+* **Week**: Monday to Sunday, with a Paul / Olivia switch: each has their own plan. Every day shows dinner; breakfast and lunch show only once one is planned. Tap a day, pick the meal, then pick a recipe, write something ("Dinner at friends"), set servings, make it pizza night, copy it to the other plan with "Same for Olivia" (or Paul), or clear it. On mix day a banner says "Mix the dough today".
+* **Recipes**: the cookbook, with a Vegetarian label and a "Vegetarian only" filter. The servings stepper scales the amounts. Plan it puts it on a day, for both or one of you, as breakfast, lunch or dinner. Add or edit by hand; the aisle is guessed from the item's name.
+* **Shopping**: this week's planned recipes from both plans and every meal, added up per item and scaled by servings, plus your own items, in supermarket order. The same recipe for the same meal in both plans is one pot: counted once, at the larger servings. Tick, untick all, remove your own items.
 * **Dough**: size, pizzas, thin, regular or thick, gluten free; grams with baker's percentages (tap a percentage to change it). Pick the pizza night and it says when to mix (3 days before, the day before for gluten free), and adds the night to the week and the flour and yeast to shopping.
 
 On the laptop, Week and Shopping sit side by side.

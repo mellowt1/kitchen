@@ -101,10 +101,12 @@ test('shopping: recipes scaled by servings, combined per item, extras, ticks, ai
       { qty: 1, unit: '', item: 'Onion', aisle: 'produce' },
       { qty: 0.8, unit: 'kg', item: 'spinach', aisle: 'produce' },
     ] },
-    'day:2026-W39:mon': { kind: 'recipe', recipeId: 'norma', servings: 2 },
-    'day:2026-W39:tue': { kind: 'recipe', recipeId: 'curry', servings: 2 },
-    'day:2026-W39:wed': { kind: 'text', text: 'Leftovers' },
-    'day:2026-W40:mon': { kind: 'recipe', recipeId: 'curry', servings: 4 },
+    // the same pot in both plans counts once
+    'day:2026-W39:mon:paul:dinner': { kind: 'recipe', recipeId: 'norma', servings: 2 },
+    'day:2026-W39:mon:olivia:dinner': { kind: 'recipe', recipeId: 'norma', servings: 2 },
+    'day:2026-W39:tue:olivia:lunch': { kind: 'recipe', recipeId: 'curry', servings: 2 },
+    'day:2026-W39:wed:paul:dinner': { kind: 'text', text: 'Leftovers' },
+    'day:2026-W40:mon:paul:dinner': { kind: 'recipe', recipeId: 'curry', servings: 4 },
     'extra:x1': { id: 'x1', week: '2026-W39', text: 'Bread flour', qty: '870 g', aisle: 'baking' },
     'extra:x2': { id: 'x2', week: '2026-W40', text: 'Milk', qty: '', aisle: 'dairy' },
     'tick:2026-W39|i:onion': { on: true },
@@ -121,4 +123,15 @@ test('shopping: recipes scaled by servings, combined per item, extras, ticks, ai
   assert.equal(s.left, 4);
   assert.equal(L.shoppingList('2026-W41', byKey).total, 0);
   assert.equal(L.sumText([{ qty: 1, unit: 'tin' }, { qty: 2, unit: 'tins' }, { qty: 100, unit: 'g' }]), '3 tin + 100 g');
+  // the larger servings of the two wins; a different meal or a different day is its own pot
+  const more = Object.assign({}, byKey, { 'day:2026-W39:mon:olivia:dinner': { kind: 'recipe', recipeId: 'norma', servings: 4 } });
+  assert.equal(L.shoppingList('2026-W39', more).groups[0].lines.find((l) => l.name === 'Spinach').qty, '1.7 kg');
+  const lunch = Object.assign({}, byKey, { 'day:2026-W39:mon:paul:lunch': { kind: 'recipe', recipeId: 'norma', servings: 2 } });
+  assert.equal(L.shoppingList('2026-W39', lunch).groups[0].lines.find((l) => l.name === 'Spinach').qty, '1.7 kg');
+  // an old shared day is not read any more (the page splits it first)
+  assert.equal(L.shoppingList('2026-W39', { 'recipe:norma': byKey['recipe:norma'], 'day:2026-W39:mon': { kind: 'recipe', recipeId: 'norma' } }).total, 0);
+  assert.equal(L.mealId('2026-W39:mon', 'olivia', 'lunch'), '2026-W39:mon:olivia:lunch');
+  assert.equal(L.isOldDayId('2026-W39:mon'), true);
+  assert.equal(L.isOldDayId('2026-W39:mon:paul:dinner'), false);
+  assert.equal(L.dateOfDayId('2026-W39:sat:olivia:dinner'), '2026-09-26');
 });
