@@ -110,6 +110,7 @@ server.registerTool('save_recipe', {
     "Add a new recipe to Paul's Kitchen app, or replace one (give its id). It shows on both phones within about 10 seconds.",
     'Write it cleaned up: English, metric units (g, ml, tbsp, tsp, pieces), short plain steps, one action each.',
     'Keep what the source gives; do not invent. Where the source gives no amount, pick a sensible one and say so in notes.',
+    'Titles are stored with capitals on the main words (Title Case, like "Chickpea and Spinach Curry" or "Seco de Pollo"); the Kitchen formats them itself, so the reply gives the title as stored.',
     'veg must be true only if the whole recipe is vegetarian (no meat or fish; his girlfriend is vegetarian). If meat is optional, keep it out of the ingredients, set veg true and mention the meat option in notes.',
     'aisle is where the item is in a supermarket: ' + AISLES.join(', ') + '.',
     'Never use em dashes or en dashes; use commas, colons or "to".',
@@ -138,8 +139,10 @@ server.registerTool('save_recipe', {
   const item = { id, title: a.title, servings: a.servings, time: a.time || '', veg: a.veg,
     ingredients: a.ingredients.map((g) => ({ qty: g.qty, unit: g.unit || '', item: g.item, aisle: g.aisle })),
     steps: a.steps, notes: a.notes || '', updatedAt };
-  await send([{ op: 'upsert', type: 'recipe', item }]);
-  return ok(`${stored ? 'Replaced' : 'Saved'} "${a.title}" (id ${id}).`);
+  const out = await send([{ op: 'upsert', type: 'recipe', item }]);
+  // The Worker stores the title in Title Case; report it as stored.
+  const saved = Array.isArray(out.items) ? out.items.find((x) => x.type === 'recipe' && x.id === id) : null;
+  return ok(`${stored ? 'Replaced' : 'Saved'} "${(saved && saved.title) || a.title}" (id ${id}).`);
 }));
 
 server.registerTool('delete_recipe', {

@@ -156,18 +156,32 @@ a:hover { color: #2C4F29; }
 
 /* ---------- Recipes ---------- */
 #recipesHome { display: flex; flex-direction: column; gap: 16px; }
-.filters { display: flex; gap: 8px; align-items: center; }
-.chip { min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rule); background: var(--card); color: var(--muted); font-size: 14px; font-weight: 500; white-space: nowrap; }
-.chip[aria-pressed="true"] { background: var(--basil-bg); border-color: var(--basil-bg); color: var(--basil); font-weight: 600; }
+.round-ink { color: var(--ink); }
+.round-ink .ico, .search .ico { stroke-width: 1.8; }
+/* The day sheet's recipe picker keeps .find; this is the Recipes tab's own search. */
 .find { flex-grow: 1; min-width: 0; min-height: 38px; padding: 0 14px; border: 1px solid var(--rule); border-radius: 999px; background: var(--card); font-size: 16px; }
-.rrow {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; width: 100%;
-  min-height: 62px; padding: 11px 16px; border: 0; border-bottom: 1px solid var(--row); background: var(--card); text-align: left;
+.search {
+  display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
+  background: var(--card); border: 1px solid var(--rule); border-radius: 999px; color: var(--muted2);
 }
-.rrow:last-child { border-bottom: 0; }
-.rtitle { font-size: 17px; overflow-wrap: anywhere; }
-.rmeta { grid-column: 1; font-size: 13px; color: var(--muted2); }
-.rrow .pillv { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+.search:focus-within { outline: 2px solid var(--basil); outline-offset: 2px; }
+.search-input { flex-grow: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; font-size: 16px; color: var(--ink); outline: none; }
+.search-input::placeholder { color: var(--muted); }
+/* Two groups, Meat and fish first, each in its own card. A long group shows five and "Show all". */
+.rgroups { display: flex; flex-direction: column; gap: 20px; }
+.rgroup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rgroup-head { margin: 0; display: flex; align-items: baseline; gap: 8px; font: inherit; }
+.rgroup-n { font-size: 13px; color: var(--muted); }
+.rrow {
+  position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%;
+  min-height: 52px; padding: 10px 16px; border: 0; background: var(--card); text-align: left;
+}
+.rrow + .rrow::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--row); }
+.rtitle { min-width: 0; font-size: 17px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.rtime { flex-shrink: 0; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.rmore { font-size: 15px; font-weight: 600; color: var(--tomato); }
+/* Rows in a card: the card clips an outside ring, so draw it inside. */
+.rrow:focus-visible, .day:focus-visible, .pick:focus-visible, .planday:focus-visible { outline-offset: -3px; border-radius: 14px; }
 
 .detail { display: flex; flex-direction: column; gap: 16px; }
 .rcard { display: flex; flex-direction: column; gap: 10px; padding: 22px 20px; background: var(--card); border: 1px solid var(--rule); border-radius: 18px; }
@@ -324,6 +338,8 @@ a:hover { color: #2C4F29; }
   .shop-list .empty-note { column-span: all; }
 
   .view.narrow { max-width: 760px; width: 100%; margin: 0 auto; }
+  .rgroups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+  .rgroups .empty-note { grid-column: 1 / -1; }
   .dough-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
   #v-dough { max-width: 1000px; width: 100%; margin: 0 auto; }
 

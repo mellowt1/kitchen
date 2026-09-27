@@ -21,7 +21,7 @@ Open the link in Safari, tap Share, then **Add to Home Screen**. It opens full s
 ## The four tabs
 
 * **Week**: Monday to Sunday, with a Paul / Olivia switch: each has their own plan. Every day shows dinner; breakfast and lunch show only once one is planned. Tap a day, pick the meal, then pick a recipe, write something ("Dinner at friends"), set servings, make it pizza night, copy it to the other plan with "Same for Olivia" (or Paul), or clear it. On mix day a banner says "Mix the dough today".
-* **Recipes**: the cookbook, with a Vegetarian label and a "Vegetarian only" filter. The servings stepper scales the amounts. Plan it puts it on a day, for both or one of you, as breakfast, lunch or dinner. Add or edit by hand; the aisle is guessed from the item's name.
+* **Recipes**: the cookbook in two groups, Meat and fish first, then Vegetarian, each A to Z with its cooking time. A group of more than six shows the first five and "Show all", so the list stays short however many recipes there are. Search shows every match in both groups. The servings stepper scales the amounts. Plan it puts it on a day, for both or one of you, as breakfast, lunch or dinner. The round + adds a recipe by hand, and Edit changes one; the aisle is guessed from the item's name.
 * **Shopping**: this week's planned recipes from both plans and every meal, added up per item and scaled by servings, plus your own items, in supermarket order. The same recipe for the same meal in both plans is one pot: counted once, at the larger servings. Tick, untick all, remove your own items.
 * **Dough**: size, pizzas, thin, regular or thick, gluten free; grams with baker's percentages (tap a percentage to change it). Pick the pizza night and it says when to mix (3 days before, the day before for gluten free), and adds the night to the week and the flour and yeast to shopping.
 
@@ -30,6 +30,8 @@ On the laptop, Week and Shopping sit side by side.
 ## Adding recipes with Claude Code
 
 Send Claude Code a recipe or a link and ask it to add it to the kitchen. It cleans it up (amounts, units, aisles, a vegetarian flag, short steps) and posts it to `POST /api/admin/kitchen/recipes` with the admin token. The recipe format and a curl example are in the todo repo's README, under Kitchen. No AI runs inside the app, so it costs nothing.
+
+Titles get capitals on the words that need them (Title Case: "Chickpea and Spinach Curry", "Seco de Pollo", "Pasta alla Norma"). The Worker and the page format them anyway, so a title sent in lower case is stored right, and older recipes are fixed the next time a phone opens the kitchen.
 
 ## Backup
 
@@ -54,7 +56,7 @@ After that, every push to `main` that touches `app/` publishes, and phones pick 
 
 ```powershell
 npm install
-npm test                          # dough maths, pizza night, weeks, amounts, aisles, shopping list
+npm test                          # dough maths, pizza night, weeks, amounts, aisles, titles, shopping list
 cd ..\todo\worker; npx wrangler dev --persist-to C:\wdk --env-file <a temp file with dev values>
 npm run serve                     # page on http://localhost:8080/kitchen/?c=<dev code>
 $env:KITCHEN_DEV_CODE='<dev code>'; $env:ADMIN_DEV_TOKEN='<dev token>'

@@ -1,8 +1,8 @@
-// The page's pure logic: dough maths, pizza night, weeks, amounts, aisles, the shopping list.
+// The page's pure logic: dough maths, pizza night, weeks, amounts, aisles, recipe titles, the shopping list.
 //   npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 // logic.js is a plain browser script that sets self.KitchenLogic; run it the way the page does.
 const holder = {};
@@ -89,6 +89,60 @@ test('aisles: a sensible guess in the right order', () => {
   for (const [item, aisle] of Object.entries(cases)) assert.equal(L.guessAisle(item), aisle, item);
 });
 
+test('titles: capitals on the words that need them', () => {
+  const cases = [
+    ['chickpea and spinach curry', 'Chickpea and Spinach Curry'],
+    ['Bulgogi Chicken', 'Bulgogi Chicken'],
+    ['seco de pollo', 'Seco de Pollo'],
+    ['pasta alla norma', 'Pasta alla Norma'],
+    ["bucatini all'amatriciana", "Bucatini all'Amatriciana"],
+    ['lemon chicken traybake', 'Lemon Chicken Traybake'],
+    ['oyakodon', 'Oyakodon'],
+    ['BBQ pulled pork', 'BBQ Pulled Pork'],
+    ['CHICKEN CURRY WITH RICE', 'Chicken Curry with Rice'],
+    ['BLT', 'BLT'],
+    ['stir-fry with ready-to-eat noodles', 'Stir-Fry with Ready-to-Eat Noodles'],
+    ["shepherd's pie", "Shepherd's Pie"],
+    ['a simple salad', 'A Simple Salad'],
+    ['pasta e fagioli', 'Pasta e Fagioli'],
+    ['coq au vin', 'Coq au Vin'],
+    ["canard à l'orange", "Canard à l'Orange"],
+    ['5-minute overnight oats', '5-Minute Overnight Oats'],
+    ['Chickpea And Spinach Curry', 'Chickpea and Spinach Curry'],
+    ['salmon: a quick one', 'Salmon: A Quick One'],
+    ['curry (with rice)', 'Curry (with Rice)'],
+    ['NY-style pizza', 'NY-Style Pizza'],
+    ['what to cook with', 'What to Cook With'],
+    ['  lots   of  space ', 'Lots of Space'],
+    ['', ''],
+    ['crème brûlée', 'Crème Brûlée'],
+    ['pollo a la brasa', 'Pollo a la Brasa'],
+    ['Seco De Pollo', 'Seco de Pollo'],
+    ["l'orange tart", "L'Orange Tart"],
+    ['MAC n CHEESE', 'Mac n Cheese'],
+    ['CHILLI (v)', 'Chilli (V)'],
+    ['chana dal curry', 'Chana Dal Curry'],
+    ['bbq chicken wings', 'BBQ Chicken Wings'],
+    ['BBQ PULLED PORK', 'BBQ Pulled Pork'],
+    ['4th of july burgers', '4th of July Burgers'],
+    ['70s prawn cocktail', '70s Prawn Cocktail'],
+    ["nell's chicken pie", "Nell's Chicken Pie"],
+    ["mac 'n' cheese", "Mac 'n' Cheese"],
+    ['TOM YUM', 'Tom Yum'],
+    ['İSKENDER KEBAP İLE PİLAV', 'Iskender Kebap Ile Pilav'],
+    ['ijsbergsla met kip', 'IJsbergsla met Kip'],
+    ["hachee van 't oosten", "Hachee van 't Oosten"],
+    ['grilled t-bone steak', 'Grilled T-Bone Steak'],
+    ['stir\u2011fry', 'Stir\u2011Fry'], // a non-breaking hyphen
+    ['ხაჭაპური', 'ხაჭაპური'],
+  ];
+  for (const [typed, want] of cases) {
+    assert.equal(L.titleCase(typed), want, typed);
+    assert.equal(L.titleCase(want), want, 'twice: ' + want); // running it again changes nothing
+    assert.equal(L.titleCase(L.titleCase(typed)), L.titleCase(typed), 'twice: ' + typed);
+  }
+});
+
 test('shopping: recipes scaled by servings, combined per item, extras, ticks, aisle order', () => {
   const byKey = {
     'recipe:curry': { id: 'curry', servings: 4, ingredients: [
@@ -134,4 +188,21 @@ test('shopping: recipes scaled by servings, combined per item, extras, ticks, ai
   assert.equal(L.isOldDayId('2026-W39:mon'), true);
   assert.equal(L.isOldDayId('2026-W39:mon:paul:dinner'), false);
   assert.equal(L.dateOfDayId('2026-W39:sat:olivia:dinner'), '2026-09-26');
+});
+
+// The Worker keeps its own copy of titleCase. If the two ever differ, the page's fixTitles and the
+// Worker keep rewriting each other's titles, so check them against each other when the todo repo
+// sits next to this one.
+const WORKER = new URL('../../todo/worker/src/kitchen.js', import.meta.url);
+test('titles: the Worker gives the same titles', { skip: !existsSync(WORKER) && 'no todo repo next to this one' }, async () => {
+  const W = await import(WORKER.href);
+  const bits = ['a', 'n', 's', 't', 'A', 'N', 'T', 'X', 'İ', 'ß', 'é', 'ij', "'", '’', '-', '/', '‑', ':', '(', ' ', '  ',
+    '4', 'th', 'and', 'AND', 'de', 'dal', 'bbq', "all'", 'nell', "l'", 'Mc', 'van', 'ǅ', 'ხ', 'ς', '\t', '&', 'PASTA', 'with'];
+  let seed = 7;
+  const pick = () => bits[(seed = (seed * 1103515245 + 12345) % 2147483648) % bits.length];
+  for (let i = 0; i < 20000; i++) {
+    let s = '';
+    for (let j = 1 + (i % 7); j > 0; j--) s += pick();
+    assert.equal(W.titleCase(s), L.titleCase(s), JSON.stringify(s));
+  }
 });

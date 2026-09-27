@@ -55,7 +55,8 @@
   $('app').hidden = false;
 
   const KEY = 'kitchen.v1.' + code;
-  const ui = Object.assign({ tab: 'week', vegOnly: false, who: 'paul' }, store.get('kitchen.ui') || {});
+  const ui = Object.assign({ tab: 'week', who: 'paul' }, store.get('kitchen.ui') || {});
+  delete ui.vegOnly; // the old "Vegetarian only" filter; the list is two groups now
   const saveUi = () => store.set('kitchen.ui', ui);
   // Whose plan the Week shows. Olivia's link carries &p=olivia, so her phone opens on hers.
   const askedWho = params.get('p');
@@ -463,18 +464,31 @@
     window.scrollTo(0, 0);
   }
 
+  // Meat and fish first, then Vegetarian, each A to Z. A group of more than LONG shows its
+  // first SHORT with "Show all"; which groups are open is kept for this visit only.
+  const GROUPS = [['meat', 'Meat and fish'], ['veg', 'Vegetarian']];
+  const LONG = 6;
+  const SHORT = 5;
+  const openGroups = new Set();
+
   function renderRecipes() {
     const all = recipes();
     $('recipeCount').textContent = all.length ? plural(all.length, 'recipe', 'recipes') : 'Your cookbook';
-    $('vegOnly').setAttribute('aria-pressed', String(!!ui.vegOnly));
     const q = $('findRecipe').value.toLowerCase().trim();
-    const list = all.filter((r) => (!ui.vegOnly || r.veg) && (!q || r.title.toLowerCase().includes(q)));
-    $('recipeList').innerHTML = list.length
-      ? list.map((r) => {
-        const meta = [r.time, 'serves ' + r.servings].filter(Boolean).join(', ');
-        return `<button type="button" class="rrow" data-recipe="${r.id}"><span class="rtitle">${esc(r.title)}</span><span class="rmeta">${esc(meta)}</span>${r.veg ? VEG : ''}</button>`;
+    const groups = GROUPS.map(([key, name]) => ({
+      key, name, list: all.filter((r) => !!r.veg === (key === 'veg') && (!q || r.title.toLowerCase().includes(q))),
+    })).filter((g) => g.list.length);
+    // While searching, every match shows.
+    $('recipeList').innerHTML = groups.length
+      ? groups.map((g) => {
+        const cut = !q && g.list.length > LONG;
+        const open = cut && openGroups.has(g.key);
+        const rows = (cut && !open ? g.list.slice(0, SHORT) : g.list).map((r) => `<button type="button" class="rrow" data-recipe="${r.id}"><span class="rtitle">${esc(r.title)}</span>${r.time ? `<span class="rtime">${esc(r.time)}</span>` : ''}</button>`);
+        if (cut) rows.push(`<button type="button" class="rrow rmore" data-more="${g.key}" aria-expanded="${open}">${open ? 'Show fewer' : 'Show all ' + g.list.length}</button>`);
+        return `<div class="rgroup"><h2 class="rgroup-head"><span class="label">${g.name}</span><span class="rgroup-n">${g.list.length}<span class="sr"> ${g.list.length === 1 ? 'recipe' : 'recipes'}</span></span></h2>`
+          + `<div class="card">${rows.join('')}</div></div>`;
       }).join('')
-      : `<p class="empty-note" style="padding:16px">${all.length ? 'No recipes match.' : 'No recipes yet. Tap Add a recipe to type one in.'}</p>`;
+      : `<p class="empty-note">${all.length ? 'No recipes match.' : 'No recipes yet. Tap + to add one.'}</p>`;
 
     if (openRecipe !== null) {
       const r = recipe(openRecipe);
@@ -503,6 +517,19 @@
         ? `<div class="confirm" role="alert"><span>Delete ${esc(r.title)} for good? Days it is planned on keep its name.</span><div class="actions"><button type="button" class="btn btn-red grow" data-delyes>Delete</button><button type="button" class="btn btn-line" data-delno>Keep it</button></div></div>`
         : '<button type="button" class="link-red" data-del>Delete this recipe</button>')
       + '</div>';
+  }
+
+  function toggleGroup(key) {
+    const open = !openGroups.has(key);
+    if (open) openGroups.add(key); else openGroups.delete(key);
+    renderRecipes();
+    // The list is drawn anew: keep the focus on this group's button, and after
+    // "Show fewer" bring it back into view if the shorter list left it off screen.
+    const b = $('recipeList').querySelector(`[data-more="${key}"]`);
+    if (!b) return;
+    b.focus({ preventScroll: true });
+    const box = b.getBoundingClientRect();
+    if (!open && (box.top < 0 || box.bottom > innerHeight - document.querySelector('.tabs').offsetHeight)) b.scrollIntoView({ block: 'center' });
   }
 
   function showRecipe(id) {
@@ -599,7 +626,10 @@
 
   function saveForm(e) {
     e.preventDefault();
-    const title = L.cleanLine($('fTitle').value, 200);
+    // "seco de pollo" is saved as "Seco de Pollo", as the Worker stores it.
+    const typed = L.cleanLine($('fTitle').value, 200);
+    const cased = L.titleCase(typed);
+    const title = cased.length > 200 ? typed : cased;
     if (!title) return formError('Give it a title.', $('fTitle'));
     const servings = Number($('fServings').value);
     if (!Number.isInteger(servings) || servings < 1 || servings > 50) return formError('Servings is a whole number from 1 to 50.', $('fServings'));
@@ -814,7 +844,9 @@
     }
     save();
     computeView();
-    if (!splitOldDays()) renderAll();
+    // Either one queues its fixes and draws the screen; with nothing to fix, draw it here.
+    // When old days were split, the titles wait for the next answer, so it is drawn once.
+    if (!splitOldDays() && !fixTitles()) renderAll();
   }
 
   // Before each had a plan, a day was one dinner for both ('<week>:<day>'). Give each of
@@ -837,6 +869,26 @@
     return ops.length > 0;
   }
 
+  // Titles have capitals on the words that need them ("Seco de Pollo"). A recipe saved before
+  // that, or by a phone still on the old page, gets its title fixed here, only from the server's
+  // copy and never over a change still waiting to be sent. The fix is stamped just after the
+  // server's version, so an edit made meanwhile on the other phone still wins. Each recipe is
+  // fixed at most once per visit, so a Worker that stores a title another way can never loop.
+  const fixedTitles = new Set();
+  function fixTitles() {
+    const ops = [];
+    const waiting = new Set(st.queue.map(opKey));
+    for (const r of Object.values(st.server)) {
+      if (r.type !== 'recipe' || fixedTitles.has(r.id) || waiting.has(keyOf('recipe', r.id))) continue;
+      const title = L.titleCase(r.title);
+      if (!title || title === r.title || title.length > 200) continue;
+      fixedTitles.add(r.id);
+      ops.push({ op: 'upsert', type: 'recipe', item: Object.assign({}, r, { title, type: 'recipe', updatedAt: (r.updatedAt || 0) + 1 }) });
+    }
+    if (ops.length) enqueue(ops);
+    return ops.length > 0;
+  }
+
   async function poll() {
     if (document.hidden || polling) return;
     if (st.queue.length && !inflight) flush();
@@ -847,6 +899,7 @@
       if (refused(r.status, d)) return showNoCode();
       if (!r.ok || !d) throw new Error('status ' + r.status);
       if (!d.unchanged) applyServer(d);
+      else fixTitles(); // the copy here is the server's latest
       if (!st.queue.length) settle();
     } catch (e) {
       setNet(navigator.onLine ? 'error' : 'offline');
@@ -941,9 +994,10 @@
   });
   $('untickAll').addEventListener('click', untickAll);
 
-  $('vegOnly').addEventListener('click', () => { ui.vegOnly = !ui.vegOnly; saveUi(); renderRecipes(); });
   $('findRecipe').addEventListener('input', renderRecipes);
   $('recipeList').addEventListener('click', (e) => {
+    const more = e.target.closest('[data-more]');
+    if (more) { toggleGroup(more.dataset.more); return; }
     const b = e.target.closest('[data-recipe]');
     if (b) showRecipe(b.dataset.recipe);
   });

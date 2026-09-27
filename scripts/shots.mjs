@@ -46,9 +46,9 @@ const shot = async (page, name, full = true) => {
 
   await page.click('.tab[data-tab="recipes"]');
   await shot(page, 'phone-recipes');
-  await page.click('#vegOnly');
-  await shot(page, 'phone-recipes-veg-only');
-  await page.click('#vegOnly');
+  await page.fill('#findRecipe', 'pasta');
+  await shot(page, 'phone-recipes-search');
+  await page.fill('#findRecipe', '');
   await page.click('[data-recipe="devcurry0001"]');
   await shot(page, 'phone-recipe');
   await page.click('[data-rsrv="1"]');
