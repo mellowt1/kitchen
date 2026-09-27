@@ -156,9 +156,24 @@ server.registerTool('delete_recipe', {
   return ok(`Deleted "${r.title}".`);
 }));
 
+/* Each of Paul and Olivia has a plan: a day record is one meal of one person,
+ * '<week>:<day>:<paul|olivia>:<breakfast|lunch|dinner>'. The old '<week>:<day>' (one dinner for
+ * both) is still read, and replaced when that dinner is planned or cleared. */
+const PEOPLE = ['paul', 'olivia'];
+const MEALS = ['breakfast', 'lunch', 'dinner'];
+const NAME = { paul: 'Paul', olivia: 'Olivia' };
+const whoArg = z.enum(['both', 'paul', 'olivia']).optional().describe('Whose plan: both (the default), paul or olivia.');
+const mealArg = z.enum(MEALS).optional().describe('breakfast, lunch or dinner (the default).');
+const whoList = (who) => (!who || who === 'both' ? PEOPLE : [who]);
+
+function mealText(rec, recipes) {
+  const what = rec.kind === 'recipe' ? (recipes[rec.recipeId]?.title || 'a deleted recipe') : rec.kind === 'pizza' ? (rec.text || 'Pizza night') : rec.text;
+  return what + (rec.servings ? ` (${rec.servings})` : '');
+}
+
 server.registerTool('get_week', {
   title: 'Get the week',
-  description: "Show the dinners planned for a week (Monday to Sunday) and that week's extra shopping items.",
+  description: "Show Paul's and Olivia's plans for a week (Monday to Sunday): breakfast, lunch and dinner where planned, and that week's extra shopping items.",
   inputSchema: { date: dateArg },
 }, safe(async ({ date }) => {
   const d = date || today();
@@ -166,22 +181,30 @@ server.registerTool('get_week', {
   const monday = addDays(d, -wd);
   const all = await records();
   const recipes = Object.fromEntries(all.filter((x) => x.type === 'recipe').map((r) => [r.id, r]));
+  const days = Object.fromEntries(all.filter((x) => x.type === 'day').map((r) => [r.id, r]));
   const lines = WEEKDAYS.map((k, i) => {
-    const day = all.find((x) => x.type === 'day' && x.id === `${week}:${k}`);
     const when = `${k[0].toUpperCase() + k.slice(1)} ${addDays(monday, i)}`;
-    if (!day) return `${when}: nothing planned`;
-    const what = day.kind === 'recipe' ? (recipes[day.recipeId]?.title || 'a deleted recipe') : day.kind === 'pizza' ? (day.text || 'Pizza night') : day.text;
-    return `${when}: ${what}${day.servings ? ` (${day.servings})` : ''}`;
+    const old = days[`${week}:${k}`];
+    const per = PEOPLE.map((p) => {
+      const meals = MEALS.map((m) => {
+        const rec = days[`${week}:${k}:${p}:${m}`] || (m === 'dinner' ? old : null);
+        return rec ? `${m} ${mealText(rec, recipes)}` : null;
+      }).filter(Boolean);
+      return `  ${NAME[p]}: ${meals.length ? meals.join('; ') : 'nothing planned'}`;
+    });
+    return `${when}\n${per.join('\n')}`;
   });
   const extras = all.filter((x) => x.type === 'extra' && x.week === week);
   return ok(`${week}\n${lines.join('\n')}\n\nExtra shopping items: ${extras.length ? extras.map((e) => e.text + (e.qty ? ` (${e.qty})` : '')).join(', ') : 'none'}`);
 }));
 
 server.registerTool('plan_day', {
-  title: 'Plan a dinner',
-  description: 'Put a dinner on a day: a saved recipe (kind recipe with recipeId), free text (kind text, like "Leftovers" or "Out"), or a pizza night (kind pizza). Replaces what was planned that day.',
+  title: 'Plan a meal',
+  description: 'Put a meal on a day, for both Paul and Olivia or one of them: a saved recipe (kind recipe with recipeId), free text (kind text, like "Leftovers" or "Out"), or a pizza night (kind pizza, dinner only). Replaces what was planned for that meal.',
   inputSchema: {
     date: dateArg,
+    who: whoArg,
+    meal: mealArg,
     kind: z.enum(['recipe', 'text', 'pizza']),
     recipeId: z.string().regex(/^[a-z0-9]{8,32}$/).optional(),
     text: z.string().max(200).optional(),
@@ -189,31 +212,54 @@ server.registerTool('plan_day', {
   },
 }, safe(async (a) => {
   const d = a.date || today();
+  const meal = a.meal || 'dinner';
   const { week, day } = isoWeek(d);
   const all = await records();
   if (a.kind === 'recipe' && !all.some((x) => x.type === 'recipe' && x.id === a.recipeId)) return fail(new Error('recipeId must be a saved recipe (see list_recipes).'));
   if (a.kind === 'text' && !(a.text || '').trim()) return fail(new Error('text is needed for kind text.'));
-  const id = `${week}:${day}`;
-  const stored = all.find((x) => x.type === 'day' && x.id === id);
-  const item = { id, kind: a.kind, recipeId: a.kind === 'recipe' ? a.recipeId : null,
-    text: a.kind === 'recipe' ? '' : (a.text || (a.kind === 'pizza' ? 'Pizza night' : '')),
-    servings: a.servings ?? null, updatedAt: Math.max(Date.now(), stored ? stored.updatedAt + 1 : 0) };
-  await send([{ op: 'upsert', type: 'day', item }]);
-  return ok(`Planned ${d}.`);
+  if (a.kind === 'pizza' && meal !== 'dinner') return fail(new Error('A pizza night is a dinner.'));
+  const stamp = (id) => { const s = all.find((x) => x.type === 'day' && x.id === id); return Math.max(Date.now(), s ? s.updatedAt + 1 : 0); };
+  const people = whoList(a.who);
+  const ops = people.map((p) => {
+    const id = `${week}:${day}:${p}:${meal}`;
+    return { op: 'upsert', type: 'day', item: { id, kind: a.kind, recipeId: a.kind === 'recipe' ? a.recipeId : null,
+      text: a.kind === 'recipe' ? '' : (a.text || (a.kind === 'pizza' ? 'Pizza night' : '')),
+      servings: a.servings ?? null, updatedAt: stamp(id) } };
+  });
+  await send(ops.concat(oldDinnerOps(all, week, day, meal, people, stamp)));
+  return ok(`Planned ${meal} on ${d} for ${people.map((p) => NAME[p]).join(' and ')}.`);
 }));
 
+// An old shared dinner on that day: give whoever is not being changed their own copy, then remove it.
+function oldDinnerOps(all, week, day, meal, people, stamp) {
+  const oldId = `${week}:${day}`;
+  const old = meal === 'dinner' && all.find((x) => x.type === 'day' && x.id === oldId);
+  if (!old) return [];
+  const keep = PEOPLE.filter((p) => !people.includes(p) && !all.some((x) => x.type === 'day' && x.id === `${week}:${day}:${p}:dinner`));
+  return keep.map((p) => {
+    const id = `${week}:${day}:${p}:dinner`;
+    return { op: 'upsert', type: 'day', item: { id, kind: old.kind, recipeId: old.recipeId || null, text: old.text || '', servings: old.servings ?? null, updatedAt: stamp(id) } };
+  }).concat([{ op: 'delete', type: 'day', item: { id: oldId, updatedAt: stamp(oldId) } }]);
+}
+
 server.registerTool('clear_day', {
-  title: 'Clear a day',
-  description: 'Remove the dinner planned on a day.',
-  inputSchema: { date: dateArg },
-}, safe(async ({ date }) => {
-  const d = date || today();
+  title: 'Clear a meal',
+  description: 'Remove a planned meal on a day, for both Paul and Olivia or one of them.',
+  inputSchema: { date: dateArg, who: whoArg, meal: mealArg },
+}, safe(async (a) => {
+  const d = a.date || today();
+  const meal = a.meal || 'dinner';
   const { week, day } = isoWeek(d);
-  const id = `${week}:${day}`;
-  const stored = (await records()).find((x) => x.type === 'day' && x.id === id);
-  if (!stored) return ok(`Nothing was planned on ${d}.`);
-  await send([{ op: 'delete', type: 'day', item: { id, updatedAt: Math.max(Date.now(), stored.updatedAt + 1) } }]);
-  return ok(`Cleared ${d}.`);
+  const all = await records();
+  const stamp = (id) => { const s = all.find((x) => x.type === 'day' && x.id === id); return Math.max(Date.now(), s ? s.updatedAt + 1 : 0); };
+  const people = whoList(a.who);
+  const ops = people.map((p) => `${week}:${day}:${p}:${meal}`)
+    .filter((id) => all.some((x) => x.type === 'day' && x.id === id))
+    .map((id) => ({ op: 'delete', type: 'day', item: { id, updatedAt: stamp(id) } }))
+    .concat(oldDinnerOps(all, week, day, meal, people, stamp));
+  if (!ops.length) return ok(`No ${meal} was planned on ${d}.`);
+  await send(ops);
+  return ok(`Cleared ${meal} on ${d} for ${people.map((p) => NAME[p]).join(' and ')}.`);
 }));
 
 server.registerTool('add_shopping_item', {

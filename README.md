@@ -69,7 +69,7 @@ On localhost the page talks to `http://localhost:8787` and skips the service wor
 
 ## Claude Desktop (recipes by chat, on the PC)
 
-`mcp/server.mjs` gives Claude Desktop eight kitchen tools: list, get, save and delete recipes, see the week, plan or clear a day, and add to the shopping list. It uses the kitchen code, like the app, so it can only touch the kitchen.
+`mcp/server.mjs` gives Claude Desktop eight kitchen tools: list, get, save and delete recipes, see both plans for a week, plan or clear a breakfast, lunch or dinner for both of you or one, and add to the shopping list. It uses the kitchen code, like the app, so it can only touch the kitchen.
 
 Set up once: `cd mcp; npm install`, then add this to Claude Desktop's config (Settings, Developer, Edit Config) and restart Claude Desktop:
 
