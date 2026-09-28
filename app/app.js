@@ -189,6 +189,8 @@
     saveUi();
     renderTabs();
     window.scrollTo(0, 0);
+    holdSpy = 0; // a glide still under way ends here
+    spy(); // back on Recipes at the top: the index marks the first page
   }
 
   /* ---------- Week ---------- */
@@ -457,28 +459,32 @@
   let confirmDelete = false;
   let editing = undefined; // undefined: no form; null: a new recipe; id: editing that one
 
+  // Leaving the list keeps its place, so Back comes to the same spot in the book.
+  let listY = 0;
   function recipeScreen(which) {
+    if (!$('recipesHome').hidden && which !== 'home') listY = window.scrollY;
     $('recipesHome').hidden = which !== 'home';
     $('recipeView').hidden = which !== 'view';
     $('recipeForm').hidden = which !== 'form';
-    window.scrollTo(0, 0);
+    window.scrollTo(0, which === 'home' ? listY : 0);
   }
 
-  // The list is a book: one page per letter, with a thumb index down the right edge.
-  // Tap or drag the index, or swipe the page, and the page turns. Searching shows every
-  // match on one page. The open letter is kept for this visit only.
+  // The list is a book you scroll through: one aged page per letter, one after another, with a
+  // thumb index down the right edge. Tap or drag the index to jump to a letter; the index
+  // follows along as you scroll. Searching shows every match on one page.
   const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '#'];
   const COUNT_WORDS = ['no recipes', 'one recipe', 'two recipes', 'three recipes', 'four recipes', 'five recipes', 'six recipes', 'seven recipes', 'eight recipes', 'nine recipes', 'ten recipes'];
   const LEAF = '<svg class="leaf" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 11 10 6 19 5c-1 9-6 14-14 14z"/><path d="M5 19l8-8"/></svg><span class="sr">, vegetarian</span>';
-  let bookAt = null; // the open letter
-  let turnEnd = null; // finishes the page turn in progress
-  let swiped = false; // a swipe just turned the page: swallow the click that follows it
+  let bookAt = null; // the letter whose page is at the top of the screen
+  let holdSpy = 0; // while a jump scrolls, the index keeps the letter jumped to
   // What was last written, since the browser reads markup back in its own spelling.
-  let drawnPage = '';
+  let drawnPages = '';
   let drawnThumbs = '';
 
   const countWords = (n) => COUNT_WORDS[n] || n + ' recipes';
   const letterName = (x) => (x === '#' ? 'Other' : x);
+  const pageId = (x) => 'page-' + (x === '#' ? 'num' : x);
+  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Accents fold to their letter (Ñ is N); a title that starts with a digit goes on the # page.
   function letterOf(title) {
     const c = title.normalize('NFD').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase();
@@ -489,7 +495,7 @@
     for (const r of all) (by[letterOf(r.title)] ||= []).push(r);
     return { by, used: LETTERS.filter((x) => by[x]) };
   }
-  // The open letter, or the next one that has recipes, or the last one.
+  // That letter, or the next one that has recipes, or the last one.
   function landOn(x, used) {
     if (used.includes(x)) return x;
     const i = LETTERS.indexOf(x);
@@ -504,86 +510,92 @@
       + '</button>';
   }
 
-  function pageHtml(x, book, turning) {
+  function pageHtml(x, book) {
     const list = book.by[x];
-    return `<article class="page${turning ? ' turning ' + turning : ''}"${turning ? ' inert aria-hidden="true"' : ''}>`
+    return `<article class="page" id="${pageId(x)}" data-letter="${x}">`
       + '<p class="page-run" aria-hidden="true">Recipes</p>'
       + `<h2 class="page-head"><span class="page-letter" aria-label="${letterName(x)}">${x}</span><span class="page-count">${countWords(list.length)}</span></h2>`
       + list.map(entryHtml).join('')
       + `<p class="page-no" aria-hidden="true">${book.used.indexOf(x) + 1}</p>`
-      + (turning ? '<span class="page-shade"></span>' : '')
       + '</article>';
   }
 
   function drawThumbs(book) {
     const html = LETTERS.filter((x) => x !== '#' || book.by['#']).map((x) => (book.by[x]
-      ? `<button type="button" class="thumb${x === bookAt ? ' on' : ''}" data-letter="${x}" aria-label="${letterName(x)}, ${countWords(book.by[x].length)}"${x === bookAt ? ' aria-current="page"' : ''}>${x}</button>`
+      ? `<button type="button" class="thumb" data-letter="${x}" aria-label="${letterName(x)}, ${countWords(book.by[x].length)}">${x}</button>`
       : `<span class="thumb empty" data-letter="${x}" aria-hidden="true">${x}</span>`)).join('');
     // Sync redraws every few seconds: leave the index alone when nothing changed, and keep
     // the focus on its letter when it is drawn anew.
     const box = $('thumbs');
-    if (drawnThumbs === html) return;
-    drawnThumbs = html;
-    const had = box.contains(document.activeElement) ? document.activeElement.dataset.letter : null;
-    box.innerHTML = html;
-    const again = had && box.querySelector(`button[data-letter="${had}"]`);
-    if (again) again.focus({ preventScroll: true });
+    if (drawnThumbs !== html) {
+      drawnThumbs = html;
+      const had = box.contains(document.activeElement) ? document.activeElement.dataset.letter : null;
+      box.innerHTML = html;
+      const again = had && box.querySelector(`button[data-letter="${had}"]`);
+      if (again) again.focus({ preventScroll: true });
+    }
+    markThumb();
+  }
+  function markThumb() {
+    for (const t of $('thumbs').children) {
+      const on = t.dataset.letter === bookAt;
+      t.classList.toggle('on', on);
+      if (t.tagName !== 'BUTTON') continue;
+      if (on) t.setAttribute('aria-current', 'true'); else t.removeAttribute('aria-current');
+    }
   }
 
   function drawBook(all) {
-    if (turnEnd) return; // the turn draws the book when it lands
     const book = bookOf(all);
+    const html = book.used.map((x) => pageHtml(x, book)).join('');
+    if (drawnPages !== html) { drawnPages = html; $('bookPages').innerHTML = html; }
     bookAt = landOn(bookAt || book.used[0], book.used);
-    const html = pageHtml(bookAt, book);
-    if (drawnPage !== html) { drawnPage = html; $('bookPages').innerHTML = html; }
     drawThumbs(book);
+    spy();
   }
 
-  function turnTo(x) {
+  // Where a page sits once jumped to: just under the top of the screen, like the index.
+  const topGap = () => parseFloat(getComputedStyle($('thumbs')).top) || 10;
+
+  // As the list scrolls, the index marks the letter whose page is at the top of the screen,
+  // or the last one once the end of the list is reached.
+  function spy() {
+    if (Date.now() < holdSpy || $('recipeBook').hidden || $('recipesHome').hidden || !$('v-recipes').classList.contains('on')) return;
+    const pages = $('bookPages').children;
+    if (!pages.length) return;
+    let at = pages[0].dataset.letter;
+    const line = topGap() + 60;
+    for (const p of pages) {
+      if (p.getBoundingClientRect().top > line) break;
+      at = p.dataset.letter;
+    }
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) at = pages[pages.length - 1].dataset.letter;
+    if (at !== bookAt) { bookAt = at; markThumb(); }
+  }
+
+  function jumpTo(x, smooth) {
     const book = bookOf(recipes());
-    if (!book.by[x] || x === bookAt) return;
-    if (turnEnd) turnEnd();
-    const from = bookAt;
-    const fwd = LETTERS.indexOf(x) > LETTERS.indexOf(from);
+    if (!book.used.length) return;
+    x = landOn(x, book.used);
+    const el = document.getElementById(pageId(x));
+    if (!el) return;
     bookAt = x;
-    drawThumbs(book);
+    markThumb();
+    const glide = smooth && !calm();
+    holdSpy = Date.now() + (glide ? 900 : 150);
+    window.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + scrollY - topGap()), behavior: glide ? 'smooth' : 'auto' });
     $('bookSays').textContent = `${letterName(x)}, ${countWords(book.by[x].length)}`;
-    // Start the new page at its top.
-    const top = $('recipeBook').getBoundingClientRect().top;
-    if (top < 0) window.scrollBy(0, top - 12);
-    // Forward: the old page lifts off the new one. Back: the new page swings in over the old.
-    const pages = $('bookPages');
-    drawnPage = '';
-    pages.innerHTML = fwd
-      ? pageHtml(x, book) + pageHtml(from, book, 'turn-fwd')
-      : pageHtml(from, book) + pageHtml(x, book, 'turn-back');
-    const leaf = pages.querySelector('.turning');
-    pages.style.minHeight = Math.max(pages.offsetHeight, leaf.offsetHeight) + 'px';
-    const done = () => {
-      if (turnEnd !== done) return;
-      turnEnd = null;
-      clearTimeout(late);
-      pages.style.minHeight = '';
-      drawBook(recipes());
-    };
-    const late = setTimeout(done, 1000); // in case animationend never comes
-    turnEnd = done;
-    leaf.addEventListener('animationend', (e) => { if (e.target === leaf) done(); });
   }
 
-  function turnBy(step) {
-    const { used } = bookOf(recipes());
-    const next = used[used.indexOf(bookAt) + step];
-    if (next) turnTo(next);
-  }
-
-  // The thumb index: tap a letter, or drag along it with a bubble showing the letter, and
-  // the page turns on release. An empty letter turns to the next one that has recipes.
+  // The thumb index: tap a letter to glide to its page, or drag along it with a bubble
+  // showing the letter and the list follows the finger. An empty letter goes to the next one.
   let scrub = null;
+  let scrubMoved = false;
   function scrubTo(y) {
     const kids = [...$('thumbs').children];
     if (!kids.length) return;
     const el = kids.find((k) => y < k.getBoundingClientRect().bottom) || kids[kids.length - 1];
+    const was = scrub;
     scrub = el.dataset.letter;
     const b = el.getBoundingClientRect();
     const bubble = $('thumbBubble');
@@ -592,13 +604,15 @@
     bubble.style.top = Math.round(b.top + b.height / 2 - 32) + 'px';
     bubble.style.left = Math.round(b.left - 76) + 'px';
     bubble.hidden = false;
+    if (was !== null && was !== scrub) { scrubMoved = true; jumpTo(scrub, false); }
   }
-  function endScrub(turn) {
+  function endScrub(jump) {
     if (scrub === null) return;
     const x = scrub;
     scrub = null;
     $('thumbBubble').hidden = true;
-    if (turn) turnTo(landOn(x, bookOf(recipes()).used));
+    if (jump && !scrubMoved) jumpTo(x, true);
+    scrubMoved = false;
   }
 
   function renderRecipes() {
@@ -609,7 +623,6 @@
     $('recipeBook').hidden = searching;
     $('recipeFound').hidden = !searching;
     if (searching) {
-      if (turnEnd) turnEnd();
       endScrub(false);
       const hits = all.filter((r) => r.title.toLowerCase().includes(q));
       $('recipeFound').innerHTML = hits.length
@@ -1142,38 +1155,30 @@
   $('findRecipe').addEventListener('input', renderRecipes);
   for (const id of ['bookPages', 'recipeFound']) {
     $(id).addEventListener('click', (e) => {
-      if (swiped) { swiped = false; return; }
       const b = e.target.closest('[data-recipe]');
       if (b) showRecipe(b.dataset.recipe);
     });
   }
-  // Swipe the page: left for the next letter, right for the one before.
-  let swipeFrom = null;
-  $('bookPages').addEventListener('pointerdown', (e) => { swiped = false; swipeFrom = e.isPrimary ? { x: e.clientX, y: e.clientY } : null; });
-  $('bookPages').addEventListener('pointerup', (e) => {
-    if (!swipeFrom) return;
-    const dx = e.clientX - swipeFrom.x;
-    const dy = e.clientY - swipeFrom.y;
-    swipeFrom = null;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
-    swiped = true;
-    setTimeout(() => { swiped = false; }, 400);
-    turnBy(dx < 0 ? 1 : -1);
-  });
-  $('bookPages').addEventListener('pointercancel', () => { swipeFrom = null; });
+  let spying = false;
+  window.addEventListener('scroll', () => {
+    if (spying) return;
+    spying = true;
+    requestAnimationFrame(() => { spying = false; spy(); });
+  }, { passive: true });
   const thumbs = $('thumbs');
   thumbs.addEventListener('pointerdown', (e) => {
     if (e.button > 0) return;
     e.preventDefault(); // no text selection or focus ring while dragging
     thumbs.setPointerCapture(e.pointerId);
+    scrubMoved = false;
     scrubTo(e.clientY);
   });
   thumbs.addEventListener('pointermove', (e) => { if (scrub !== null) scrubTo(e.clientY); });
   thumbs.addEventListener('pointerup', () => endScrub(true));
   thumbs.addEventListener('pointercancel', () => endScrub(false));
-  thumbs.addEventListener('click', (e) => { // the keyboard; a tap has already turned on pointerup
+  thumbs.addEventListener('click', (e) => { // the keyboard; a tap has already jumped on pointerup
     const b = e.target.closest('button[data-letter]');
-    if (b) turnTo(b.dataset.letter);
+    if (b && e.detail === 0) jumpTo(b.dataset.letter, true);
   });
   $('recipeView').addEventListener('click', recipeViewAction);
   $('newRecipe').addEventListener('click', () => openForm(null));

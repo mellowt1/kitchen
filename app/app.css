@@ -169,13 +169,12 @@ a:hover { color: #2C4F29; }
 .search:focus-within { outline: 2px solid var(--basil); outline-offset: 2px; }
 .search-input { flex-grow: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; font-size: 16px; color: var(--ink); outline: none; }
 .search-input::placeholder { color: var(--muted); }
-/* The list is a book: one aged page per letter, a thumb index down the right edge.
+/* The list is a book to scroll through: one aged page per letter, a thumb index down the right edge.
  * Newsreader for the entries, Caveat for a recipe's note in the margin, like pencil. */
 .book { display: grid; grid-template-columns: minmax(0, 1fr) 28px; column-gap: 6px; margin-right: -16px; }
-.pages { position: relative; min-width: 0; touch-action: pan-y; }
+.pages { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
 .page {
   position: relative; display: flex; flex-direction: column; box-sizing: border-box;
-  min-height: max(380px, calc(100dvh - var(--safe-t) - var(--safe-b) - 300px));
   padding: 14px 18px 48px 28px; border: 1px solid #E2D5BF; border-radius: 3px 10px 10px 3px;
   background-color: #FAF3E6;
   background-image:
@@ -204,32 +203,6 @@ a:hover { color: #2C4F29; }
 .page-found { min-height: 0; padding-bottom: 18px; }
 .page-found .page-run { margin-bottom: 0; }
 .entry:focus-visible { outline-offset: 2px; border-radius: 6px; }
-
-/* A page being turned lies over the one in place and swings on its left edge. */
-.page.turning { position: absolute; top: 0; left: 0; right: 0; z-index: 2; pointer-events: none; transform-origin: left center; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
-.page-shade { position: absolute; inset: 0; opacity: 0; pointer-events: none; border-radius: inherit; background: linear-gradient(to left, rgba(60, 35, 15, .38), rgba(60, 35, 15, 0) 75%); }
-.turn-fwd { animation: page-out .18s ease forwards; }
-.turn-back { animation: page-in .18s ease forwards; }
-@keyframes page-out { to { opacity: 0; } }
-@keyframes page-in { from { opacity: 0; } }
-@media (prefers-reduced-motion: no-preference) {
-  .turn-fwd { animation: turn-fwd .62s cubic-bezier(.45, .05, .25, 1) forwards; }
-  .turn-back { animation: turn-back .62s cubic-bezier(.45, .05, .25, 1) forwards; }
-  .turn-fwd .page-shade { animation: shade-in .62s ease-in forwards; }
-  .turn-back .page-shade { animation: shade-out .62s ease-out forwards; }
-  @keyframes turn-fwd {
-    from { transform: perspective(1500px) rotateY(0); }
-    45% { box-shadow: 18px 0 34px rgba(60, 35, 15, .22); }
-    to { transform: perspective(1500px) rotateY(-112deg); }
-  }
-  @keyframes turn-back {
-    from { transform: perspective(1500px) rotateY(-112deg); }
-    55% { box-shadow: 18px 0 34px rgba(60, 35, 15, .22); }
-    to { transform: perspective(1500px) rotateY(0); }
-  }
-  @keyframes shade-in { from { opacity: 0; } to { opacity: .55; } }
-  @keyframes shade-out { from { opacity: .55; } to { opacity: 0; } }
-}
 
 /* The thumb index stays in view while a long page scrolls. */
 .thumbs {
