@@ -469,13 +469,13 @@
     window.scrollTo(0, which === 'home' ? listY : 0);
   }
 
-  // The list is a book you scroll through: one aged page per letter, one after another, with a
-  // thumb index down the right edge. Tap or drag the index to jump to a letter; the index
+  // The list is an index you scroll through: each letter over its own card of recipes, one
+  // after another, with a thumb index down the right edge. Tap or drag the index to jump to a letter; the index
   // follows along as you scroll. Searching shows every match on one page.
   const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '#'];
   const COUNT_WORDS = ['no recipes', 'one recipe', 'two recipes', 'three recipes', 'four recipes', 'five recipes', 'six recipes', 'seven recipes', 'eight recipes', 'nine recipes', 'ten recipes'];
   const LEAF = '<svg class="leaf" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 11 10 6 19 5c-1 9-6 14-14 14z"/><path d="M5 19l8-8"/></svg><span class="sr">, vegetarian</span>';
-  let bookAt = null; // the letter whose page is at the top of the screen
+  let bookAt = null; // the letter whose section is at the top of the screen
   let holdSpy = 0; // while a jump scrolls, the index keeps the letter jumped to
   // What was last written, since the browser reads markup back in its own spelling.
   let drawnPages = '';
@@ -510,12 +510,10 @@
 
   function pageHtml(x, book) {
     const list = book.by[x];
-    return `<article class="page" id="${pageId(x)}" data-letter="${x}">`
-      + '<p class="page-run" aria-hidden="true">Recipes</p>'
-      + `<h2 class="page-head"><span class="page-letter" aria-label="${letterName(x)}">${x}</span><span class="page-count">${countWords(list.length)}</span></h2>`
-      + list.map(entryHtml).join('')
-      + `<p class="page-no" aria-hidden="true">${book.used.indexOf(x) + 1}</p>`
-      + '</article>';
+    return `<section class="idx" id="${pageId(x)}" data-letter="${x}">`
+      + `<h2 class="idx-letter"><span aria-hidden="true">${x}</span><span class="sr">${letterName(x)}, ${countWords(list.length)}</span></h2>`
+      + `<div class="card">${list.map(entryHtml).join('')}</div>`
+      + '</section>';
   }
 
   function drawThumbs(book) {
@@ -562,12 +560,18 @@
     const pages = $('bookPages').children;
     if (!pages.length) return;
     let at = pages[0].dataset.letter;
-    const line = topGap() + 60;
+    // The line a section has to pass to count. Over the last screen of scrolling it slides down
+    // to the bottom, so the short sections at the end, which never reach the top, still get
+    // their turn, one after another.
+    const top = topGap() + 60;
+    const bottom = innerHeight - document.querySelector('.tabs').offsetHeight - 24;
+    const left = document.documentElement.scrollHeight - innerHeight - scrollY;
+    const tail = innerHeight * 0.8;
+    const line = left < tail ? top + (bottom - top) * (1 - Math.max(0, left) / tail) : top;
     for (const p of pages) {
       if (p.getBoundingClientRect().top > line) break;
       at = p.dataset.letter;
     }
-    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) at = pages[pages.length - 1].dataset.letter;
     if (at !== bookAt) { bookAt = at; markThumb(); }
   }
 
@@ -624,7 +628,7 @@
       endScrub(false);
       const hits = all.filter((r) => r.title.toLowerCase().includes(q));
       $('recipeFound').innerHTML = hits.length
-        ? `<article class="page page-found"><p class="page-run">${plural(hits.length, 'match', 'matches')}</p>${hits.map(entryHtml).join('')}</article>`
+        ? `<div class="idx"><p class="label found-n">${plural(hits.length, 'match', 'matches')}</p><div class="card">${hits.map(entryHtml).join('')}</div></div>`
         : `<p class="empty-note">${all.length ? 'No recipes match.' : 'No recipes yet. Tap + to add one.'}</p>`;
     } else {
       $('recipeFound').innerHTML = '';
