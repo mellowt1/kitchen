@@ -464,31 +464,161 @@
     window.scrollTo(0, 0);
   }
 
-  // Meat and fish first, then Vegetarian, each A to Z. A group of more than LONG shows its
-  // first SHORT with "Show all"; which groups are open is kept for this visit only.
-  const GROUPS = [['meat', 'Meat and fish'], ['veg', 'Vegetarian']];
-  const LONG = 6;
-  const SHORT = 5;
-  const openGroups = new Set();
+  // The list is a book: one page per letter, with a thumb index down the right edge.
+  // Tap or drag the index, or swipe the page, and the page turns. Searching shows every
+  // match on one page. The open letter is kept for this visit only.
+  const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '#'];
+  const COUNT_WORDS = ['no recipes', 'one recipe', 'two recipes', 'three recipes', 'four recipes', 'five recipes', 'six recipes', 'seven recipes', 'eight recipes', 'nine recipes', 'ten recipes'];
+  const LEAF = '<svg class="leaf" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 11 10 6 19 5c-1 9-6 14-14 14z"/><path d="M5 19l8-8"/></svg><span class="sr">, vegetarian</span>';
+  let bookAt = null; // the open letter
+  let turnEnd = null; // finishes the page turn in progress
+  let swiped = false; // a swipe just turned the page: swallow the click that follows it
+  // What was last written, since the browser reads markup back in its own spelling.
+  let drawnPage = '';
+  let drawnThumbs = '';
+
+  const countWords = (n) => COUNT_WORDS[n] || n + ' recipes';
+  const letterName = (x) => (x === '#' ? 'Other' : x);
+  // Accents fold to their letter (Ñ is N); a title that starts with a digit goes on the # page.
+  function letterOf(title) {
+    const c = title.normalize('NFD').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase();
+    return LETTERS.includes(c) ? c : '#';
+  }
+  function bookOf(all) {
+    const by = {};
+    for (const r of all) (by[letterOf(r.title)] ||= []).push(r);
+    return { by, used: LETTERS.filter((x) => by[x]) };
+  }
+  // The open letter, or the next one that has recipes, or the last one.
+  function landOn(x, used) {
+    if (used.includes(x)) return x;
+    const i = LETTERS.indexOf(x);
+    return used.find((u) => LETTERS.indexOf(u) > i) || used[used.length - 1];
+  }
+
+  function entryHtml(r) {
+    const note = (r.notes || '').split('\n')[0].trim();
+    return `<button type="button" class="entry" data-recipe="${r.id}"><span class="e-title">${esc(r.title)}${r.veg ? LEAF : ''}</span>`
+      + (r.time ? `<span class="e-time">${esc(r.time)}</span>` : '')
+      + (note ? `<span class="e-note">${esc(note)}</span>` : '')
+      + '</button>';
+  }
+
+  function pageHtml(x, book, turning) {
+    const list = book.by[x];
+    return `<article class="page${turning ? ' turning ' + turning : ''}"${turning ? ' inert aria-hidden="true"' : ''}>`
+      + '<p class="page-run" aria-hidden="true">Recipes</p>'
+      + `<h2 class="page-head"><span class="page-letter" aria-label="${letterName(x)}">${x}</span><span class="page-count">${countWords(list.length)}</span></h2>`
+      + list.map(entryHtml).join('')
+      + `<p class="page-no" aria-hidden="true">${book.used.indexOf(x) + 1}</p>`
+      + (turning ? '<span class="page-shade"></span>' : '')
+      + '</article>';
+  }
+
+  function drawThumbs(book) {
+    const html = LETTERS.filter((x) => x !== '#' || book.by['#']).map((x) => (book.by[x]
+      ? `<button type="button" class="thumb${x === bookAt ? ' on' : ''}" data-letter="${x}" aria-label="${letterName(x)}, ${countWords(book.by[x].length)}"${x === bookAt ? ' aria-current="page"' : ''}>${x}</button>`
+      : `<span class="thumb empty" data-letter="${x}" aria-hidden="true">${x}</span>`)).join('');
+    // Sync redraws every few seconds: leave the index alone when nothing changed, and keep
+    // the focus on its letter when it is drawn anew.
+    const box = $('thumbs');
+    if (drawnThumbs === html) return;
+    drawnThumbs = html;
+    const had = box.contains(document.activeElement) ? document.activeElement.dataset.letter : null;
+    box.innerHTML = html;
+    const again = had && box.querySelector(`button[data-letter="${had}"]`);
+    if (again) again.focus({ preventScroll: true });
+  }
+
+  function drawBook(all) {
+    if (turnEnd) return; // the turn draws the book when it lands
+    const book = bookOf(all);
+    bookAt = landOn(bookAt || book.used[0], book.used);
+    const html = pageHtml(bookAt, book);
+    if (drawnPage !== html) { drawnPage = html; $('bookPages').innerHTML = html; }
+    drawThumbs(book);
+  }
+
+  function turnTo(x) {
+    const book = bookOf(recipes());
+    if (!book.by[x] || x === bookAt) return;
+    if (turnEnd) turnEnd();
+    const from = bookAt;
+    const fwd = LETTERS.indexOf(x) > LETTERS.indexOf(from);
+    bookAt = x;
+    drawThumbs(book);
+    $('bookSays').textContent = `${letterName(x)}, ${countWords(book.by[x].length)}`;
+    // Start the new page at its top.
+    const top = $('recipeBook').getBoundingClientRect().top;
+    if (top < 0) window.scrollBy(0, top - 12);
+    // Forward: the old page lifts off the new one. Back: the new page swings in over the old.
+    const pages = $('bookPages');
+    drawnPage = '';
+    pages.innerHTML = fwd
+      ? pageHtml(x, book) + pageHtml(from, book, 'turn-fwd')
+      : pageHtml(from, book) + pageHtml(x, book, 'turn-back');
+    const leaf = pages.querySelector('.turning');
+    pages.style.minHeight = Math.max(pages.offsetHeight, leaf.offsetHeight) + 'px';
+    const done = () => {
+      if (turnEnd !== done) return;
+      turnEnd = null;
+      clearTimeout(late);
+      pages.style.minHeight = '';
+      drawBook(recipes());
+    };
+    const late = setTimeout(done, 1000); // in case animationend never comes
+    turnEnd = done;
+    leaf.addEventListener('animationend', (e) => { if (e.target === leaf) done(); });
+  }
+
+  function turnBy(step) {
+    const { used } = bookOf(recipes());
+    const next = used[used.indexOf(bookAt) + step];
+    if (next) turnTo(next);
+  }
+
+  // The thumb index: tap a letter, or drag along it with a bubble showing the letter, and
+  // the page turns on release. An empty letter turns to the next one that has recipes.
+  let scrub = null;
+  function scrubTo(y) {
+    const kids = [...$('thumbs').children];
+    if (!kids.length) return;
+    const el = kids.find((k) => y < k.getBoundingClientRect().bottom) || kids[kids.length - 1];
+    scrub = el.dataset.letter;
+    const b = el.getBoundingClientRect();
+    const bubble = $('thumbBubble');
+    bubble.textContent = scrub;
+    bubble.classList.toggle('dim', el.classList.contains('empty'));
+    bubble.style.top = Math.round(b.top + b.height / 2 - 32) + 'px';
+    bubble.style.left = Math.round(b.left - 76) + 'px';
+    bubble.hidden = false;
+  }
+  function endScrub(turn) {
+    if (scrub === null) return;
+    const x = scrub;
+    scrub = null;
+    $('thumbBubble').hidden = true;
+    if (turn) turnTo(landOn(x, bookOf(recipes()).used));
+  }
 
   function renderRecipes() {
     const all = recipes();
     $('recipeCount').textContent = all.length ? plural(all.length, 'recipe', 'recipes') : 'Your cookbook';
     const q = $('findRecipe').value.toLowerCase().trim();
-    const groups = GROUPS.map(([key, name]) => ({
-      key, name, list: all.filter((r) => !!r.veg === (key === 'veg') && (!q || r.title.toLowerCase().includes(q))),
-    })).filter((g) => g.list.length);
-    // While searching, every match shows.
-    $('recipeList').innerHTML = groups.length
-      ? groups.map((g) => {
-        const cut = !q && g.list.length > LONG;
-        const open = cut && openGroups.has(g.key);
-        const rows = (cut && !open ? g.list.slice(0, SHORT) : g.list).map((r) => `<button type="button" class="rrow" data-recipe="${r.id}"><span class="rtitle">${esc(r.title)}</span>${r.time ? `<span class="rtime">${esc(r.time)}</span>` : ''}</button>`);
-        if (cut) rows.push(`<button type="button" class="rrow rmore" data-more="${g.key}" aria-expanded="${open}">${open ? 'Show fewer' : 'Show all ' + g.list.length}</button>`);
-        return `<div class="rgroup"><h2 class="rgroup-head"><span class="label">${g.name}</span><span class="rgroup-n">${g.list.length}<span class="sr"> ${g.list.length === 1 ? 'recipe' : 'recipes'}</span></span></h2>`
-          + `<div class="card">${rows.join('')}</div></div>`;
-      }).join('')
-      : `<p class="empty-note">${all.length ? 'No recipes match.' : 'No recipes yet. Tap + to add one.'}</p>`;
+    const searching = !!q || !all.length;
+    $('recipeBook').hidden = searching;
+    $('recipeFound').hidden = !searching;
+    if (searching) {
+      if (turnEnd) turnEnd();
+      endScrub(false);
+      const hits = all.filter((r) => r.title.toLowerCase().includes(q));
+      $('recipeFound').innerHTML = hits.length
+        ? `<article class="page page-found"><p class="page-run">${plural(hits.length, 'match', 'matches')}</p>${hits.map(entryHtml).join('')}</article>`
+        : `<p class="empty-note">${all.length ? 'No recipes match.' : 'No recipes yet. Tap + to add one.'}</p>`;
+    } else {
+      $('recipeFound').innerHTML = '';
+      drawBook(all);
+    }
 
     if (openRecipe !== null) {
       const r = recipe(openRecipe);
@@ -517,19 +647,6 @@
         ? `<div class="confirm" role="alert"><span>Delete ${esc(r.title)} for good? Days it is planned on keep its name.</span><div class="actions"><button type="button" class="btn btn-red grow" data-delyes>Delete</button><button type="button" class="btn btn-line" data-delno>Keep it</button></div></div>`
         : '<button type="button" class="link-red" data-del>Delete this recipe</button>')
       + '</div>';
-  }
-
-  function toggleGroup(key) {
-    const open = !openGroups.has(key);
-    if (open) openGroups.add(key); else openGroups.delete(key);
-    renderRecipes();
-    // The list is drawn anew: keep the focus on this group's button, and after
-    // "Show fewer" bring it back into view if the shorter list left it off screen.
-    const b = $('recipeList').querySelector(`[data-more="${key}"]`);
-    if (!b) return;
-    b.focus({ preventScroll: true });
-    const box = b.getBoundingClientRect();
-    if (!open && (box.top < 0 || box.bottom > innerHeight - document.querySelector('.tabs').offsetHeight)) b.scrollIntoView({ block: 'center' });
   }
 
   function showRecipe(id) {
@@ -995,11 +1112,40 @@
   $('untickAll').addEventListener('click', untickAll);
 
   $('findRecipe').addEventListener('input', renderRecipes);
-  $('recipeList').addEventListener('click', (e) => {
-    const more = e.target.closest('[data-more]');
-    if (more) { toggleGroup(more.dataset.more); return; }
-    const b = e.target.closest('[data-recipe]');
-    if (b) showRecipe(b.dataset.recipe);
+  for (const id of ['bookPages', 'recipeFound']) {
+    $(id).addEventListener('click', (e) => {
+      if (swiped) { swiped = false; return; }
+      const b = e.target.closest('[data-recipe]');
+      if (b) showRecipe(b.dataset.recipe);
+    });
+  }
+  // Swipe the page: left for the next letter, right for the one before.
+  let swipeFrom = null;
+  $('bookPages').addEventListener('pointerdown', (e) => { swiped = false; swipeFrom = e.isPrimary ? { x: e.clientX, y: e.clientY } : null; });
+  $('bookPages').addEventListener('pointerup', (e) => {
+    if (!swipeFrom) return;
+    const dx = e.clientX - swipeFrom.x;
+    const dy = e.clientY - swipeFrom.y;
+    swipeFrom = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+    swiped = true;
+    setTimeout(() => { swiped = false; }, 400);
+    turnBy(dx < 0 ? 1 : -1);
+  });
+  $('bookPages').addEventListener('pointercancel', () => { swipeFrom = null; });
+  const thumbs = $('thumbs');
+  thumbs.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
+    e.preventDefault(); // no text selection or focus ring while dragging
+    thumbs.setPointerCapture(e.pointerId);
+    scrubTo(e.clientY);
+  });
+  thumbs.addEventListener('pointermove', (e) => { if (scrub !== null) scrubTo(e.clientY); });
+  thumbs.addEventListener('pointerup', () => endScrub(true));
+  thumbs.addEventListener('pointercancel', () => endScrub(false));
+  thumbs.addEventListener('click', (e) => { // the keyboard; a tap has already turned on pointerup
+    const b = e.target.closest('button[data-letter]');
+    if (b) turnTo(b.dataset.letter);
   });
   $('recipeView').addEventListener('click', recipeViewAction);
   $('newRecipe').addEventListener('click', () => openForm(null));

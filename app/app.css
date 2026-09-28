@@ -20,6 +20,8 @@
   --basil-bg: #E3ECDD;
   --brown: #8A5A3C;
   --serif: 'Young Serif', Georgia, serif;
+  --book: 'Newsreader', Georgia, serif;
+  --hand: 'Caveat', 'Bradley Hand', cursive;
   --sans: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
@@ -167,21 +169,88 @@ a:hover { color: #2C4F29; }
 .search:focus-within { outline: 2px solid var(--basil); outline-offset: 2px; }
 .search-input { flex-grow: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; font-size: 16px; color: var(--ink); outline: none; }
 .search-input::placeholder { color: var(--muted); }
-/* Two groups, Meat and fish first, each in its own card. A long group shows five and "Show all". */
-.rgroups { display: flex; flex-direction: column; gap: 20px; }
-.rgroup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.rgroup-head { margin: 0; display: flex; align-items: baseline; gap: 8px; font: inherit; }
-.rgroup-n { font-size: 13px; color: var(--muted); }
-.rrow {
-  position: relative; display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%;
-  min-height: 52px; padding: 10px 16px; border: 0; background: var(--card); text-align: left;
+/* The list is a book: one aged page per letter, a thumb index down the right edge.
+ * Newsreader for the entries, Caveat for a recipe's note in the margin, like pencil. */
+.book { display: grid; grid-template-columns: minmax(0, 1fr) 28px; column-gap: 6px; margin-right: -16px; }
+.pages { position: relative; min-width: 0; touch-action: pan-y; }
+.page {
+  position: relative; display: flex; flex-direction: column; box-sizing: border-box;
+  min-height: max(380px, calc(100dvh - var(--safe-t) - var(--safe-b) - 300px));
+  padding: 14px 18px 48px 28px; border: 1px solid #E2D5BF; border-radius: 3px 10px 10px 3px;
+  background-color: #FAF3E6;
+  background-image:
+    linear-gradient(to right, rgba(90, 60, 30, .15), rgba(90, 60, 30, 0) 22px),
+    radial-gradient(130% 95% at 45% 42%, rgba(120, 80, 40, 0) 62%, rgba(120, 80, 40, .10) 100%),
+    radial-gradient(circle at 86% 88%, rgba(150, 100, 50, .07) 0, rgba(150, 100, 50, .07) 22px, rgba(150, 100, 50, 0) 44px);
+  box-shadow: 2px 2px 0 #F1E8D8, 3px 3px 0 #DCCFB9, 5px 5px 0 #F1E8D8, 6px 6px 0 #DCCFB9;
 }
-.rrow + .rrow::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--row); }
-.rtitle { min-width: 0; font-size: 17px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
-.rtime { flex-shrink: 0; font-size: 14px; color: var(--muted); white-space: nowrap; }
-.rmore { font-size: 15px; font-weight: 600; color: var(--tomato); }
+.page-run { margin: 0 0 4px; padding-bottom: 8px; border-bottom: 1px solid #DCCFB9; text-align: center; font-family: var(--book); font-style: italic; font-size: 14px; color: var(--muted2); }
+.page-head { margin: 10px 0 0; padding-bottom: 12px; display: flex; align-items: baseline; gap: 14px; font: inherit; border-bottom: 3px double #CDBFAC; }
+.page-letter { font-family: var(--serif); font-weight: 400; font-size: 76px; line-height: .95; color: #B23A26; }
+.page-count { font-family: var(--book); font-style: italic; font-size: 16px; color: var(--muted); }
+.entry {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-height: 48px;
+  padding: 11px 0 10px; border: 0; border-bottom: 1px dotted #CDBFAC; background: none; text-align: left;
+}
+.e-title { font-family: var(--book); font-size: 20px; line-height: 1.25; color: var(--ink); overflow-wrap: anywhere; }
+.leaf { display: inline-block; margin-left: 7px; vertical-align: -1px; fill: none; stroke: var(--basil); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.e-time { font-family: var(--book); font-style: italic; font-size: 15px; color: var(--muted); }
+.e-note {
+  margin-top: 2px; max-width: 100%; font-family: var(--hand); font-weight: 500; font-size: 21px; line-height: 1.1; color: #3F5378;
+  transform: rotate(-1.5deg); transform-origin: left center;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.page-no { position: absolute; left: 0; right: 0; bottom: 14px; margin: 0; text-align: center; font-family: var(--book); font-size: 14px; color: var(--muted2); }
+.page-found { min-height: 0; padding-bottom: 18px; }
+.page-found .page-run { margin-bottom: 0; }
+.entry:focus-visible { outline-offset: 2px; border-radius: 6px; }
+
+/* A page being turned lies over the one in place and swings on its left edge. */
+.page.turning { position: absolute; top: 0; left: 0; right: 0; z-index: 2; pointer-events: none; transform-origin: left center; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.page-shade { position: absolute; inset: 0; opacity: 0; pointer-events: none; border-radius: inherit; background: linear-gradient(to left, rgba(60, 35, 15, .38), rgba(60, 35, 15, 0) 75%); }
+.turn-fwd { animation: page-out .18s ease forwards; }
+.turn-back { animation: page-in .18s ease forwards; }
+@keyframes page-out { to { opacity: 0; } }
+@keyframes page-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .turn-fwd { animation: turn-fwd .62s cubic-bezier(.45, .05, .25, 1) forwards; }
+  .turn-back { animation: turn-back .62s cubic-bezier(.45, .05, .25, 1) forwards; }
+  .turn-fwd .page-shade { animation: shade-in .62s ease-in forwards; }
+  .turn-back .page-shade { animation: shade-out .62s ease-out forwards; }
+  @keyframes turn-fwd {
+    from { transform: perspective(1500px) rotateY(0); }
+    45% { box-shadow: 18px 0 34px rgba(60, 35, 15, .22); }
+    to { transform: perspective(1500px) rotateY(-112deg); }
+  }
+  @keyframes turn-back {
+    from { transform: perspective(1500px) rotateY(-112deg); }
+    55% { box-shadow: 18px 0 34px rgba(60, 35, 15, .22); }
+    to { transform: perspective(1500px) rotateY(0); }
+  }
+  @keyframes shade-in { from { opacity: 0; } to { opacity: .55; } }
+  @keyframes shade-out { from { opacity: .55; } to { opacity: 0; } }
+}
+
+/* The thumb index stays in view while a long page scrolls. */
+.thumbs {
+  position: sticky; top: calc(var(--safe-t) + 10px); align-self: start;
+  display: flex; flex-direction: column; height: min(600px, calc(100dvh - var(--safe-t) - var(--safe-b) - 280px)); min-height: 300px;
+  touch-action: none; -webkit-user-select: none; user-select: none;
+}
+.thumb {
+  flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 0 0 3px; border: 0;
+  border-radius: 9px 0 0 9px; background: none; font-family: var(--serif); font-size: 13px; line-height: 1; color: #5E4B3A;
+}
+.thumb.on { background: #B23A26; color: #fff; }
+.thumb.empty { color: #C7B9A4; }
+.thumb:focus-visible { outline-offset: -2px; }
+.thumb-bubble {
+  position: fixed; z-index: 30; width: 64px; height: 64px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  background: #B23A26; color: #fff; font-family: var(--serif); font-size: 34px; box-shadow: 0 6px 18px rgba(60, 35, 15, .25); pointer-events: none;
+}
+.thumb-bubble.dim { opacity: .55; }
 /* Rows in a card: the card clips an outside ring, so draw it inside. */
-.rrow:focus-visible, .day:focus-visible, .pick:focus-visible, .planday:focus-visible { outline-offset: -3px; border-radius: 14px; }
+.day:focus-visible, .pick:focus-visible, .planday:focus-visible { outline-offset: -3px; border-radius: 14px; }
 
 .detail { display: flex; flex-direction: column; gap: 16px; }
 .rcard { display: flex; flex-direction: column; gap: 10px; padding: 22px 20px; background: var(--card); border: 1px solid var(--rule); border-radius: 18px; }
@@ -338,8 +407,6 @@ a:hover { color: #2C4F29; }
   .shop-list .empty-note { column-span: all; }
 
   .view.narrow { max-width: 760px; width: 100%; margin: 0 auto; }
-  .rgroups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
-  .rgroups .empty-note { grid-column: 1 / -1; }
   .dough-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
   #v-dough { max-width: 1000px; width: 100%; margin: 0 auto; }
 
