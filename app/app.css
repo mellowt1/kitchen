@@ -265,6 +265,8 @@ a:hover { color: #2C4F29; }
 .ings { margin: 0; padding: 0; list-style: none; }
 .ings li { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--rule); font-size: 16px; }
 .ings .q { color: var(--brown); font-weight: 600; }
+/* A section of the ingredients, like "For the marinade". */
+.ing-sub { margin: 14px 0 0; font-family: var(--book); font-style: italic; font-weight: 400; font-size: 18px; color: var(--brown); }
 .steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
 .steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; font-size: 16px; line-height: 1.5; }
 .steps .n { font-family: var(--serif); color: var(--tomato); }
@@ -285,9 +287,14 @@ a:hover { color: #2C4F29; }
 .check-row { display: flex; justify-content: space-between; align-items: center; min-height: 52px; font-size: 16px; }
 .check-row input { width: 22px; height: 22px; accent-color: var(--basil); margin: 0; }
 .ing-rows { display: flex; flex-direction: column; gap: 10px; margin-top: -6px; }
-.ing { display: grid; grid-template-columns: 60px 64px minmax(0, 1fr) 36px; gap: 6px; padding-bottom: 10px; border-bottom: 1px dashed var(--rule); }
+.ing { display: grid; grid-template-columns: 52px 82px minmax(0, 1fr) 36px; gap: 6px; padding-bottom: 10px; border-bottom: 1px dashed var(--rule); }
 .ing input { padding: 9px 8px; }
 .ing select { grid-column: 1 / span 3; min-height: 38px; padding: 6px 8px; font-size: 14px; color: var(--muted); background: var(--card); }
+/* A section heading in the form, above the rows it holds. */
+.ing-sec { display: grid; grid-template-columns: minmax(0, 1fr) 36px; gap: 6px; margin-top: 8px; }
+.ing-sec input { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--seg); font-family: var(--book); font-style: italic; font-size: 17px; color: var(--brown); }
+.ing-sec input::placeholder { color: var(--faint); }
+.ing-adds { display: flex; flex-wrap: wrap; gap: 8px; }
 .ing-del { width: 36px; height: 44px; border: 0; background: none; color: var(--faint); font-size: 20px; padding: 0; }
 .form-error { margin: 0; color: var(--tomato); font-size: 15px; }
 

@@ -338,7 +338,10 @@
     ml: ['ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters'], l: ['l', 'litre', 'litres', 'liter', 'liters', 'ltr'],
     cl: ['cl'], dl: ['dl'],
     tbsp: ['tbsp', 'tbs', 'tablespoon', 'tablespoons', 'el'], tsp: ['tsp', 'teaspoon', 'teaspoons', 'tl'],
+    cup: ['cup', 'cups', 'c'], piece: ['piece', 'pieces', 'pc', 'pcs'],
   };
+  // Counted units read one or many by the amount: "½ cup", "1 cup", "2 cups", "3 pieces".
+  const COUNTED = { cup: ['cup', 'cups'], piece: ['piece', 'pieces'] };
   const UNIT_OF = {};
   for (const [u, list] of Object.entries(UNIT_SYNONYMS)) for (const s of list) UNIT_OF[s] = u;
   function normUnit(u) {
@@ -367,7 +370,21 @@
     if (n === 'g' && qty >= 1000) return num(qty / 1000, true) + ' kg';
     if (n === 'ml' && qty >= 1000) return num(qty / 1000, true) + ' l';
     const q = num(qty, !!METRIC[n]);
+    if (COUNTED[n]) return q + ' ' + COUNTED[n][qty > 1 + 1e-9 ? 1 : 0];
     return u ? q + ' ' + u : q;
+  }
+
+  /* A recipe's ingredients in their sections, in order: [{ group, items }]. An ingredient
+   * without a group is in the unnamed section ''. */
+  function ingredientGroups(list) {
+    const out = [];
+    for (const g of list || []) {
+      const name = String(g.group || '').trim();
+      const last = out[out.length - 1];
+      if (last && last.group === name) last.items.push(g);
+      else out.push({ group: name, items: [g] });
+    }
+    return out;
   }
 
   function scale(qty, factor) {
@@ -469,7 +486,7 @@
     PEOPLE, PERSON_NAME, MEALS, MEAL_NAME, mealId, isOldDayId, plannedRecipes,
     TF, BASE, GF, RES, DOUGH_DEFAULT, TWEAK_STEP, TWEAK_RANGE, doughCalc, grams, ballGrams, pctText, STEPS_NY, STEPS_GF, bakeNote,
     MIX_DAYS, mixDate, pizzaPlan, mixDueToday,
-    parseQty, normUnit, amountText, scale, itemKey, itemName, sumText, shoppingList,
+    parseQty, normUnit, amountText, ingredientGroups, scale, itemKey, itemName, sumText, shoppingList,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.KitchenLogic = api;

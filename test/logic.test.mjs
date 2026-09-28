@@ -79,6 +79,28 @@ test('amounts: parse, print and scale', () => {
   assert.equal(L.amountText(L.scale(200, 2 / 4), 'g'), '100 g');
 });
 
+test('cups and pieces read one or many by the amount, and add up', () => {
+  assert.equal(L.amountText(0.5, 'cups'), '½ cup');
+  assert.equal(L.amountText(1, 'cups'), '1 cup');
+  assert.equal(L.amountText(1.5, 'cup'), '1½ cups');
+  assert.equal(L.amountText(L.scale(1, 3 / 4), 'cup'), '¾ cup');
+  assert.equal(L.amountText(1, 'pieces'), '1 piece');
+  assert.equal(L.amountText(4, 'pcs'), '4 pieces');
+  assert.equal(L.amountText(1 / 3, 'Cups'), '⅓ cup');
+  assert.equal(L.sumText([{ qty: 1, unit: 'cup' }, { qty: 0.5, unit: 'cups' }]), '1½ cups');
+  assert.equal(L.sumText([{ qty: 2, unit: 'pieces' }, { qty: 1, unit: 'piece' }, { qty: 100, unit: 'g' }]), '3 pieces + 100 g');
+});
+
+test('ingredient sections keep their order and run together', () => {
+  const g = (item, group) => ({ qty: 1, unit: '', item, aisle: 'other', group });
+  const out = L.ingredientGroups([g('salt'), g('lemon', 'For the marinade'), g('garlic', 'For the marinade'), g('potatoes', 'For the roast potatoes'), g('oil', ' For the marinade ')]);
+  assert.deepEqual(out.map((s) => [s.group, s.items.map((i) => i.item)]), [
+    ['', ['salt']], ['For the marinade', ['lemon', 'garlic']], ['For the roast potatoes', ['potatoes']], ['For the marinade', ['oil']],
+  ]);
+  assert.deepEqual(L.ingredientGroups([]), []);
+  assert.deepEqual(L.ingredientGroups(undefined), []);
+});
+
 test('aisles: a sensible guess in the right order', () => {
   const cases = {
     'coconut milk': 'tins', milk: 'dairy', 'black pepper': 'spices', 'red pepper': 'produce', chickpeas: 'tins', eggs: 'dairy',

@@ -113,6 +113,7 @@ server.registerTool('save_recipe', {
     'Titles are stored with capitals on the main words (Title Case, like "Chickpea and Spinach Curry" or "Seco de Pollo"); the Kitchen formats them itself, so the reply gives the title as stored.',
     'veg must be true only if the whole recipe is vegetarian (no meat or fish; his girlfriend is vegetarian). If meat is optional, keep it out of the ingredients, set veg true and mention the meat option in notes.',
     'aisle is where the item is in a supermarket: ' + AISLES.join(', ') + '.',
+    'Where the source splits the ingredients (for the marinade, for the salad), give each ingredient in that part the same group, like "For the marinade", and keep each part together in order.',
     'Never use em dashes or en dashes; use commas, colons or "to".',
   ].join(' '),
   inputSchema: {
@@ -126,6 +127,7 @@ server.registerTool('save_recipe', {
       unit: z.string().max(20).optional(),
       item: z.string().min(1).max(120),
       aisle: z.enum(AISLES),
+      group: z.string().max(60).optional().describe('The section it is under, like "For the marinade". Leave out when the recipe has no sections.'),
     })).max(80),
     steps: z.array(z.string().min(1).max(1000)).max(40),
     notes: z.string().max(4000).optional(),
@@ -137,7 +139,7 @@ server.registerTool('save_recipe', {
   const id = a.id || newId();
   const updatedAt = Math.max(Date.now(), stored ? stored.updatedAt + 1 : 0);
   const item = { id, title: a.title, servings: a.servings, time: a.time || '', veg: a.veg,
-    ingredients: a.ingredients.map((g) => ({ qty: g.qty, unit: g.unit || '', item: g.item, aisle: g.aisle })),
+    ingredients: a.ingredients.map((g) => ({ qty: g.qty, unit: g.unit || '', item: g.item, aisle: g.aisle, ...(g.group ? { group: g.group } : {}) })),
     steps: a.steps, notes: a.notes || '', updatedAt };
   const out = await send([{ op: 'upsert', type: 'recipe', item }]);
   // The Worker stores the title in Title Case; report it as stored.

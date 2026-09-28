@@ -630,7 +630,9 @@
   function renderRecipeView(r) {
     const n = openServings || r.servings;
     const factor = n / r.servings;
-    const ings = r.ingredients.map((g) => `<li><span class="q">${esc(L.amountText(L.scale(g.qty, factor), g.unit))}</span><span>${esc(g.item)}</span></li>`).join('');
+    // Each section ("For the marinade") under its own small heading, in the order written.
+    const ings = L.ingredientGroups(r.ingredients).map((sec) => (sec.group ? `<h3 class="ing-sub">${esc(sec.group)}</h3>` : '')
+      + '<ul class="ings">' + sec.items.map((g) => `<li><span class="q">${esc(L.amountText(L.scale(g.qty, factor), g.unit))}</span><span>${esc(g.item)}</span></li>`).join('') + '</ul>').join('');
     const steps = r.steps.map((s, i) => `<li><span class="n">${i + 1}</span><span>${esc(s)}</span></li>`).join('');
     $('recipeView').innerHTML = '<div class="detail">'
       + '<button type="button" class="round" data-back aria-label="Back to recipes" style="font-size:20px">‹</button>'
@@ -638,7 +640,7 @@
       + (r.veg ? VEG : '')
       + `<h1>${esc(r.title)}</h1>`
       + `<div class="rmeta-row"><div class="stepper"><button type="button" data-rsrv="-1" aria-label="Fewer servings">−</button><span>${n}</span><button type="button" data-rsrv="1" aria-label="More servings">+</button></div><span>servings</span>${r.time ? `<span>${esc(r.time)}</span>` : ''}</div>`
-      + (ings ? `<span class="label">Ingredients</span><ul class="ings">${ings}</ul>` : '')
+      + (ings ? `<span class="label">Ingredients</span>${ings}` : '')
       + (steps ? `<span class="label">Method</span><ol class="steps">${steps}</ol>` : '')
       + (r.notes ? `<span class="label">Notes</span><p class="notes">${esc(r.notes)}</p>` : '')
       + '</div>'
@@ -694,7 +696,7 @@
   function ingRow(g) {
     const row = document.createElement('div');
     row.className = 'ing';
-    const n = $('fIngredients').children.length + 1;
+    const n = $('fIngredients').querySelectorAll('.ing').length + 1;
     row.innerHTML = `<input class="i-qty" inputmode="decimal" placeholder="2" aria-label="Amount, row ${n}">`
       + `<input class="i-unit" list="units" placeholder="g" maxlength="20" aria-label="Unit, row ${n}" autocapitalize="off">`
       + `<input class="i-item" placeholder="Item" maxlength="120" aria-label="Item, row ${n}">`
@@ -705,6 +707,18 @@
     row.querySelector('.i-item').value = (g && g.item) || '';
     row.querySelector('.i-aisle').value = (g && g.aisle) || 'other';
     if (g && g.item) row.dataset.manual = '1';
+    $('fIngredients').appendChild(row);
+    return row;
+  }
+
+  // A section heading in the form: the ingredient rows below it, up to the next heading, are
+  // saved with its name as their group. An empty name ends the section above it.
+  function secRow(name) {
+    const row = document.createElement('div');
+    row.className = 'ing-sec';
+    row.innerHTML = '<input class="s-name" placeholder="For the marinade" maxlength="60" aria-label="Section name">'
+      + '<button type="button" class="ing-del" aria-label="Remove this section heading">×</button>';
+    row.querySelector('.s-name').value = name || '';
     $('fIngredients').appendChild(row);
     return row;
   }
@@ -723,7 +737,12 @@
     $('formError').hidden = true;
     $('fIngredients').innerHTML = '';
     const ings = r && r.ingredients.length ? r.ingredients : [null, null, null];
-    for (const g of ings) ingRow(g);
+    let group = '';
+    for (const g of ings) {
+      const name = (g && g.group) || '';
+      if (name !== group) { secRow(name); group = name; }
+      ingRow(g);
+    }
     recipeScreen('form');
     if (!r) $('fTitle').focus({ preventScroll: true });
   }
@@ -751,9 +770,16 @@
     const servings = Number($('fServings').value);
     if (!Number.isInteger(servings) || servings < 1 || servings > 50) return formError('Servings is a whole number from 1 to 50.', $('fServings'));
     const ingredients = [];
-    const rows = [...$('fIngredients').children];
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
+    // Rows in order: a heading sets the section for the ingredient rows below it.
+    let group = '';
+    let i = -1;
+    for (const row of $('fIngredients').children) {
+      if (row.classList.contains('ing-sec')) {
+        const name = L.cleanLine(row.querySelector('.s-name').value, 60);
+        group = name.charAt(0).toUpperCase() + name.slice(1); // "for the marinade" reads "For the marinade"
+        continue;
+      }
+      i++;
       const qtyEl = row.querySelector('.i-qty');
       const item = L.cleanLine(row.querySelector('.i-item').value, 120);
       const rawQty = qtyEl.value;
@@ -762,7 +788,9 @@
       if (!item) return formError(`Row ${i + 1} needs an item.`, row.querySelector('.i-item'));
       const qty = L.parseQty(rawQty);
       if (Number.isNaN(qty) || (qty !== null && qty > 100000)) return formError(`The amount on row ${i + 1} is not a number. Try 2, 1.5 or 1/2.`, qtyEl);
-      ingredients.push({ qty: qty === null ? null : Math.round(qty * 1000) / 1000, unit, item, aisle: row.querySelector('.i-aisle').value });
+      const g = { qty: qty === null ? null : Math.round(qty * 1000) / 1000, unit, item, aisle: row.querySelector('.i-aisle').value };
+      if (group) g.group = group;
+      ingredients.push(g);
     }
     if (ingredients.length > 80) return formError('At most 80 ingredients.');
     const steps = $('fSteps').value.split(/\r?\n/).map((s) => L.cleanLine(s, 1000)).filter(Boolean);
@@ -1151,10 +1179,27 @@
   $('newRecipe').addEventListener('click', () => openForm(null));
   $('cancelForm').addEventListener('click', closeForm);
   $('recipeForm').addEventListener('submit', saveForm);
-  $('addIng').addEventListener('click', () => ingRow(null).querySelector('.i-qty').focus());
+  // The empty ingredient rows at the end of the form (a new recipe starts with three).
+  function emptyTail() {
+    const out = [];
+    for (let r = $('fIngredients').lastElementChild; r && r.classList.contains('ing'); r = r.previousElementSibling) {
+      if ([...r.querySelectorAll('input')].some((x) => x.value.trim())) break;
+      out.unshift(r);
+    }
+    return out;
+  }
+  // Both use an empty row at the end before making a new one, so no blank rows pile up.
+  $('addIng').addEventListener('click', () => (emptyTail()[0] || ingRow(null)).querySelector('.i-qty').focus());
+  $('addSec').addEventListener('click', () => {
+    const tail = emptyTail();
+    const h = secRow('');
+    if (tail.length) $('fIngredients').insertBefore(h, tail[0]);
+    else ingRow(null);
+    h.querySelector('.s-name').focus();
+  });
   $('fIngredients').addEventListener('click', (e) => {
     const del = e.target.closest('.ing-del');
-    if (del) del.closest('.ing').remove();
+    if (del) del.closest('.ing, .ing-sec').remove();
   });
   $('fIngredients').addEventListener('input', (e) => {
     const row = e.target.closest('.ing');

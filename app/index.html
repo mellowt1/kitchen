@@ -139,7 +139,10 @@
 
           <span class="label">Ingredients</span>
           <div id="fIngredients" class="ing-rows"></div>
-          <button type="button" class="btn btn-line btn-small" id="addIng">Add an ingredient</button>
+          <div class="ing-adds">
+            <button type="button" class="btn btn-line btn-small" id="addIng">Add an ingredient</button>
+            <button type="button" class="btn btn-line btn-small" id="addSec">Add a section</button>
+          </div>
 
           <label class="field"><span class="label">Method</span><textarea id="fSteps" rows="6" placeholder="One step per line"></textarea></label>
           <label class="field"><span class="label">Notes</span><textarea id="fNotes" rows="3" maxlength="4000" placeholder="Anything worth remembering"></textarea></label>
@@ -149,7 +152,7 @@
           <button type="submit" class="btn btn-red grow">Save</button>
           <button type="button" class="btn btn-line" id="cancelForm">Cancel</button>
         </div>
-        <datalist id="units"><option value="g"><option value="kg"><option value="ml"><option value="l"><option value="tsp"><option value="tbsp"><option value="tins"><option value="cloves"><option value="pinch"><option value="bunch"><option value="pack"></datalist>
+        <datalist id="units"><option value="g"><option value="kg"><option value="ml"><option value="l"><option value="cups"><option value="tsp"><option value="tbsp"><option value="pieces"><option value="tins"><option value="cloves"><option value="pinch"><option value="bunch"><option value="pack"></datalist>
       </form>
     </section>
 
