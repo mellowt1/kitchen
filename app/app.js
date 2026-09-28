@@ -503,10 +503,8 @@
   }
 
   function entryHtml(r) {
-    const note = (r.notes || '').split('\n')[0].trim();
     return `<button type="button" class="entry" data-recipe="${r.id}"><span class="e-title">${esc(r.title)}${r.veg ? LEAF : ''}</span>`
       + (r.time ? `<span class="e-time">${esc(r.time)}</span>` : '')
-      + (note ? `<span class="e-note">${esc(note)}</span>` : '')
       + '</button>';
   }
 
