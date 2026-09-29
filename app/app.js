@@ -185,6 +185,7 @@
 
   function setTab(t) {
     if (ui.tab === t) return;
+    if (t !== 'recipes' && dayRecipeOpen()) { fromDay = null; openRecipe = null; recipeScreen('home'); }
     ui.tab = t;
     saveUi();
     renderTabs();
@@ -209,7 +210,7 @@
       const named = meals.length > 1;
       const lines = meals.map((m) => {
         const v = dayView(L.mealId(d.id, ui.who, m));
-        return `<span class="meal meal-${m}"><span class="meal-name">${named ? L.MEAL_NAME[m] : ''}</span>`
+        return `<span class="meal meal-${m}" data-m="${m}"><span class="meal-name">${named ? L.MEAL_NAME[m] : ''}</span>`
           + `<span class="meal-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(v.title)}</span>${v.veg ? VEG : ''}</span>`
           + `<span class="day-side"><span class="srv">${esc(v.side)}</span></span></span>`;
       });
@@ -458,6 +459,29 @@
   let openServings = 0;
   let confirmDelete = false;
   let editing = undefined; // undefined: no form; null: a new recipe; id: editing that one
+  // A recipe opened from the Week tab: { day, meal, recipeId }. Back goes to the week, Change to its sheet.
+  let fromDay = null;
+  let weekY = 0;
+  const dayRecipeOpen = () => !!fromDay && openRecipe === fromDay.recipeId;
+
+  function openDayRecipe(day, meal, rec) {
+    weekY = window.scrollY;
+    fromDay = { day, meal, recipeId: rec.recipeId };
+    openRecipe = rec.recipeId;
+    openServings = rec.servings || 0;
+    confirmDelete = false;
+    renderRecipes();
+    recipeScreen('view');
+    setTab('recipes');
+  }
+
+  function backToWeek() {
+    fromDay = null;
+    openRecipe = null;
+    recipeScreen('home');
+    setTab('week');
+    window.scrollTo(0, weekY);
+  }
 
   // Leaving the list keeps its place, so Back comes to the same spot in the book.
   let listY = 0;
@@ -649,8 +673,11 @@
     const ings = L.ingredientGroups(r.ingredients).map((sec) => (sec.group ? `<h3 class="ing-sub">${esc(sec.group)}</h3>` : '')
       + '<ul class="ings">' + sec.items.map((g) => `<li><span class="q">${esc(L.amountText(L.scale(g.qty, factor), g.unit))}</span><span>${esc(g.item)}</span></li>`).join('') + '</ul>').join('');
     const steps = r.steps.map((s, i) => `<li><span class="n">${i + 1}</span><span>${esc(s)}</span></li>`).join('');
+    const fd = dayRecipeOpen() ? fromDay : null;
     $('recipeView').innerHTML = '<div class="detail">'
-      + '<button type="button" class="round" data-back aria-label="Back to recipes" style="font-size:20px">‹</button>'
+      + (fd
+        ? `<div class="day-bar"><button type="button" class="round" data-back aria-label="Back to the week" style="font-size:20px">‹</button><span class="day-bar-what">${esc(L.dayName(L.dateOfDayId(fd.day)))}'s ${fd.meal}</span><button type="button" class="btn btn-line btn-mid" data-change>Change</button></div>`
+        : '<button type="button" class="round" data-back aria-label="Back to recipes" style="font-size:20px">‹</button>')
       + '<div class="rcard">'
       + (r.veg ? VEG : '')
       + `<h1>${esc(r.title)}</h1>`
@@ -677,7 +704,17 @@
   function recipeViewAction(e) {
     const r = recipe(openRecipe);
     if (!r) return;
-    if (e.target.closest('[data-back]')) { openRecipe = null; recipeScreen('home'); return; }
+    if (e.target.closest('[data-back]')) {
+      if (dayRecipeOpen()) backToWeek();
+      else { openRecipe = null; recipeScreen('home'); }
+      return;
+    }
+    if (e.target.closest('[data-change]') && dayRecipeOpen()) {
+      const { day, meal } = fromDay;
+      backToWeek();
+      openDaySheet(day, meal);
+      return;
+    }
     const s = e.target.closest('[data-rsrv]');
     if (s) {
       openServings = Math.min(50, Math.max(1, (openServings || r.servings) + Number(s.dataset.rsrv)));
@@ -1121,9 +1158,15 @@
     saveUi();
     renderWeek();
   });
+  // A meal with a recipe opens the recipe; anything else opens the sheet to plan it.
   $('days').addEventListener('click', (e) => {
     const b = e.target.closest('[data-day]');
-    if (b) openDaySheet(b.dataset.day);
+    if (!b) return;
+    const line = e.target.closest('[data-m]');
+    const meal = line ? line.dataset.m : 'dinner';
+    const rec = dayRec(L.mealId(b.dataset.day, ui.who, meal));
+    if (rec && rec.kind === 'recipe' && recipe(rec.recipeId)) openDayRecipe(b.dataset.day, meal, rec);
+    else openDaySheet(b.dataset.day, meal);
   });
 
   $('sheet').addEventListener('click', (e) => {
