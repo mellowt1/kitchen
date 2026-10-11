@@ -1,6 +1,6 @@
 # Kitchen: spec
 
-A shared kitchen app for Paul and his girlfriend: the week's dinners, recipes, a shopping list and Paul's pizza dough calculator. It replaces the "Kitchen Notebook" artifact, which needed a Claude login and lived inside claude.ai. Approved by Paul 23 Sept 2026.
+A shared kitchen app for Paul and Olivia: a week plan each (breakfast, lunch and dinner), recipes, one shopping list and Paul's pizza dough calculator. It replaces the "Kitchen Notebook" artifact, which needed a Claude login and lived inside claude.ai. Approved by Paul 23 Sept 2026.
 
 ## Who and where
 - Paul and his girlfriend, both with the same rights. She has no Claude account and needs none.

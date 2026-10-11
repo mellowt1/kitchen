@@ -2,7 +2,7 @@
   "name": "kitchen",
   "private": true,
   "type": "module",
-  "description": "Paul's Kitchen: the week's dinners, recipes, shopping and pizza dough. A static PWA that syncs through the paul-hub Worker.",
+  "description": "Paul and Olivia's Kitchen: a week plan each (breakfast, lunch and dinner), recipes, one shopping list and pizza dough. A static PWA that syncs through the paul-hub Worker.",
   "scripts": {
     "test": "node --test test/logic.test.mjs",
     "icons": "node scripts/make-icons.mjs",
