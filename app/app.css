@@ -112,6 +112,8 @@ a:hover { color: #2C4F29; }
 .day-title.pizza { color: var(--tomato); font-family: var(--serif); }
 .day-title.gone { color: var(--muted2); font-style: italic; }
 .day-side { font-size: 13px; color: var(--muted2); white-space: nowrap; }
+/* Out for dinner that day (from the calendar, through the hub). */
+.away { align-self: flex-start; font-size: 12px; font-weight: 600; color: var(--tomato-ink); background: var(--tomato-bg); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 
 /* ---------- Shopping ---------- */
 .shop-head { flex-wrap: wrap; }

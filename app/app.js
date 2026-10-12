@@ -64,8 +64,8 @@
   if (!L.PEOPLE.includes(ui.who)) ui.who = 'paul';
   const saved = store.get(KEY);
   const st = saved && typeof saved === 'object'
-    ? { server: saved.server || {}, rev: saved.rev || 0, queue: Array.isArray(saved.queue) ? saved.queue : [] }
-    : { server: {}, rev: 0, queue: [] };
+    ? { server: saved.server || {}, rev: saved.rev || 0, queue: Array.isArray(saved.queue) ? saved.queue : [], away: Array.isArray(saved.away) ? saved.away : [] }
+    : { server: {}, rev: 0, queue: [], away: [] };
   const save = () => store.set(KEY, st);
 
   /* ---------- Model ---------- */
@@ -208,13 +208,16 @@
       const meals = L.MEALS.filter((m) => m === 'dinner' || dayRec(L.mealId(d.id, ui.who, m)));
       // A day with only dinner reads like before; the names show once there is more.
       const named = meals.length > 1;
+      // His calendar has something over dinner that day (set by the hub; no title reaches here).
+      const out = st.away.includes(d.date) ? L.PERSON_NAME.paul + ' out' : '';
       const lines = meals.map((m) => {
         const v = dayView(L.mealId(d.id, ui.who, m));
         return `<span class="meal meal-${m}" data-m="${m}"><span class="meal-name">${named ? L.MEAL_NAME[m] : ''}</span>`
-          + `<span class="meal-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(v.title)}</span>${v.veg ? VEG : ''}</span>`
+          + `<span class="meal-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(v.title)}</span>${v.veg ? VEG : ''}`
+          + `${m === 'dinner' && out ? `<span class="away">${esc(out)}</span>` : ''}</span>`
           + `<span class="day-side"><span class="srv">${esc(v.side)}</span></span></span>`;
       });
-      const said = meals.map((m) => L.MEAL_NAME[m] + ' ' + dayView(L.mealId(d.id, ui.who, m)).title).join(', ');
+      const said = meals.map((m) => L.MEAL_NAME[m] + ' ' + dayView(L.mealId(d.id, ui.who, m)).title).join(', ') + (out ? ', ' + out : '');
       return `<button type="button" class="day${isToday ? ' today' : ''}" data-day="${d.id}"${isToday ? ' aria-current="date"' : ''} aria-label="${esc(d.name + ' ' + d.dayNum + ': ' + said)}">`
         + `<span class="day-when"><b>${d.short}</b><span>${d.dayNum}</span></span>`
         + `<span class="day-what">${lines.join('')}</span>`
@@ -1038,6 +1041,7 @@
       for (const i of d.items) m[keyOf(i.type, i.id)] = i;
       st.server = m;
       st.rev = d.rev || 0;
+      if (Array.isArray(d.away)) st.away = d.away.filter((x) => typeof x === 'string');
     }
     save();
     computeView();
