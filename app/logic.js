@@ -207,7 +207,7 @@
   const BASE = { water: 62, yeast: 0.4, salt: 2.5, sugar: 2, oil: 3.3 }; // baker's percentages
   const GF = { ball: 1.1708, flour: 1.1717, water: 80 };
   const RES = 1.0075; // a little extra for what sticks to the bowl
-  const DOUGH_DEFAULT = { size: 14, count: 2, thickness: 'regular', gf: false, night: null, tweaks: {} };
+  const DOUGH_DEFAULT = { size: 14, count: 2, thickness: 'regular', gf: false, night: null, tweaks: {}, toppings: { pizza: [], flammkuchen: [] } };
   const TWEAK_STEP = { water: 1, yeast: 0.1, salt: 0.1, sugar: 0.5, oil: 0.1, gfWater: 1 };
   const TWEAK_RANGE = { water: [40, 100], yeast: [0, 5], salt: [0, 6], sugar: [0, 10], oil: [0, 15], gfWater: [40, 110] };
 
@@ -421,10 +421,65 @@
     return out.join(' + ');
   }
 
+  // Never on the list: water from the tap, and what was cooked before.
+  const NEVER_RE = /^(?:(?:cold|hot|warm|lukewarm|boiling|ice|iced|tap|filtered)\s+)?water$|^leftover/;
+  // In the house as a rule until set otherwise (a staple record with on: false).
+  const STAPLES = ['i:salt', 'i:sea salt', 'i:fine salt', 'i:kosher salt', 'i:pepper', 'i:black pepper', 'i:ground black pepper'];
+  // Aisles of things that keep: checked at home, not bought every week.
+  const PANTRY = ['pasta', 'tins', 'baking', 'spices', 'other'];
+  // The nights that bring their own toppings (worker/src/kitchen.js has the same keys).
+  const TOPPING_NIGHTS = ['pizza', 'flammkuchen'];
+  const NIGHT_NAME = { pizza: 'Pizza night', flammkuchen: 'Flammkuchen' };
+
+  const isStaple = (key, byKey) => {
+    const r = byKey['staple:' + key];
+    return r ? !!r.on : STAPLES.includes(key);
+  };
+  // A dish as the list names it: "Seco de Pollo (Ecuadorian Chicken Stew)" -> "Seco de Pollo".
+  const shortTitle = (t) => String(t || '').replace(/\s*\(.*?\)/g, '').trim() || String(t || '').trim();
+
+  // How many pizza and flammkuchen nights the week has, in either plan. A flammkuchen night is a
+  // meal whose recipe or written text says Flammkuchen; the dough's pizza night counts too.
+  function toppingNights(week, byKey) {
+    const at = { pizza: new Set(), flammkuchen: new Set() };
+    for (const d of weekDays(week)) {
+      for (const meal of MEALS) {
+        for (const who of PEOPLE) {
+          const rec = byKey['day:' + mealId(d.id, who, meal)];
+          if (!rec) continue;
+          if (rec.kind === 'pizza') at.pizza.add(d.date);
+          const said = rec.kind === 'recipe' ? (byKey['recipe:' + rec.recipeId] || {}).title : rec.text;
+          if (/flammkuchen/i.test(said || '')) at.flammkuchen.add(d.date);
+        }
+      }
+    }
+    const dough = byKey['dough:dough'];
+    if (dough && dough.night && isoWeek(dough.night).week === week) at.pizza.add(dough.night);
+    return { pizza: at.pizza.size, flammkuchen: at.flammkuchen.size };
+  }
+
+  // Units a typed line may start with, after its amount: "250 g mozzarella", "2 tins tomatoes".
+  const LINE_UNITS = ['tin', 'tins', 'can', 'cans', 'jar', 'jars', 'pack', 'packs', 'packet', 'packets', 'bag', 'bags', 'ball', 'balls', 'bunch', 'bunches', 'clove', 'cloves', 'slice', 'slices', 'tub', 'tubs'];
+  /* "250 g mozzarella", "250g mozzarella", "2 balls burrata", "Basil" -> { qty, unit, item }. */
+  function parseItemLine(text) {
+    const t = cleanLine(text, 200);
+    const m = t.match(/^(\d+(?:[.,]\d+)?(?:\s+\d+\/\d+|\/\d+)?|\d*\s*[½⅓⅔¼¾⅛])\s*(.+)$/);
+    const qty = m ? parseQty(m[1]) : null;
+    if (!m || !(qty > 0)) return { qty: null, unit: '', item: t };
+    const u = m[2].match(/^([A-Za-z]+)\.?\s+(.+)$/);
+    if (u && (UNIT_OF[u[1].toLowerCase()] || LINE_UNITS.includes(u[1].toLowerCase()))) return { qty, unit: u[1].toLowerCase(), item: u[2] };
+    return { qty, unit: '', item: m[2] };
+  }
+
   /* The week's shopping list.
    *   week     'YYYY-Www'
-   *   byKey    { 'recipe:<id>': recipe, 'day:<id>': day, 'extra:<id>': extra, 'tick:<id>': tick }
-   * -> { groups: [{ aisle, name, lines: [{ key, name, qty, on, extraId }] }], left, total } */
+   *   byKey    { 'recipe:<id>': recipe, 'day:<id>': day, 'extra:<id>': extra, 'tick:<id>': tick,
+   *              'staple:<key>': staple, 'dough:dough': dough }
+   * -> { buy, check: [{ aisle, name, lines: [{ key, name, qty, on, extraId, dishes }] }],
+   *      groups (buy then check), staples: [{ key, name }], left, total, toBuy, dishes, dinners }
+   * Buy is what goes bad (vegetables, meat, dairy...) and every item added by hand; Check is
+   * what keeps (rice, tins, spices, sauces), to look for at home first. A staple is in the house
+   * as a rule and only listed by name. Water never shows. */
   // Every planned recipe of the week, both plans, every meal. The same recipe for the same
   // meal in both plans is one pot, cooked once, at the larger of the two servings.
   function plannedRecipes(week, byKey) {
@@ -448,36 +503,61 @@
 
   function shoppingList(week, byKey) {
     const lines = new Map();
+    const dishes = []; // what the list is for, in the order planned, each once
+    const addDish = (d) => { if (d && !dishes.includes(d)) dishes.push(d); };
+    const addPart = (item, aisle, qty, unit, dish) => {
+      const key = 'i:' + itemKey(item);
+      if (NEVER_RE.test(key.slice(2))) return;
+      let l = lines.get(key);
+      if (!l) {
+        l = { key, name: itemName(item), aisle: AISLE_KEYS.includes(aisle) ? aisle : 'other', parts: [], dishes: [] };
+        lines.set(key, l);
+      }
+      l.parts.push({ qty, unit });
+      if (dish && !l.dishes.includes(dish)) l.dishes.push(dish);
+    };
     for (const { recipe: r, servings } of plannedRecipes(week, byKey)) {
       const factor = servings && r.servings ? servings / r.servings : 1;
-      for (const g of r.ingredients || []) {
-        const key = 'i:' + itemKey(g.item);
-        let l = lines.get(key);
-        if (!l) {
-          l = { key, name: itemName(g.item), aisle: AISLE_KEYS.includes(g.aisle) ? g.aisle : 'other', parts: [] };
-          lines.set(key, l);
-        }
-        l.parts.push({ qty: scale(g.qty, factor), unit: g.unit });
-      }
+      const dish = shortTitle(r.title);
+      addDish(dish);
+      for (const g of r.ingredients || []) addPart(g.item, g.aisle, scale(g.qty, factor), g.unit, dish);
+    }
+    // Each pizza or flammkuchen night brings its toppings, once per night.
+    const nights = toppingNights(week, byKey);
+    const tops = (byKey['dough:dough'] || {}).toppings || {};
+    for (const k of TOPPING_NIGHTS) {
+      if (!nights[k]) continue;
+      if (k === 'pizza' || !dishes.some((d) => /flammkuchen/i.test(d))) addDish(NIGHT_NAME[k]);
+      for (const g of tops[k] || []) addPart(g.item, g.aisle, scale(g.qty, nights[k]), g.unit, NIGHT_NAME[k]);
     }
     for (const [k, x] of Object.entries(byKey)) {
       if (!k.startsWith('extra:') || x.week !== week) continue;
-      lines.set('x:' + x.id, { key: 'x:' + x.id, name: x.text, aisle: AISLE_KEYS.includes(x.aisle) ? x.aisle : 'other', qtyText: x.qty || '', extraId: x.id, at: x.updatedAt || 0 });
+      lines.set('x:' + x.id, { key: 'x:' + x.id, name: x.text, aisle: AISLE_KEYS.includes(x.aisle) ? x.aisle : 'other', qtyText: x.qty || '', extraId: x.id, at: x.updatedAt || 0, dishes: [] });
     }
-    const groups = [];
+    const all = [...lines.values()];
+    const staples = all.filter((l) => !l.extraId && isStaple(l.key, byKey)).map((l) => ({ key: l.key, name: l.name })).sort((a, b) => a.name.localeCompare(b.name));
+    const listed = all.filter((l) => l.extraId || !isStaple(l.key, byKey));
     let left = 0;
     let total = 0;
-    for (const [aisle, name] of AISLES) {
-      const ls = [...lines.values()].filter((l) => l.aisle === aisle).map((l) => {
-        const t = byKey['tick:' + week + '|' + l.key];
-        const on = !!(t && t.on);
-        total++;
-        if (!on) left++;
-        return { key: l.key, name: l.name, qty: l.extraId ? l.qtyText : sumText(l.parts), on, extraId: l.extraId || null };
-      }).sort((a, b) => a.name.localeCompare(b.name));
-      if (ls.length) groups.push({ aisle, name, lines: ls });
-    }
-    return { groups, left, total };
+    let toBuy = 0;
+    const section = (inIt) => {
+      const groups = [];
+      for (const [aisle, name] of AISLES) {
+        const ls = listed.filter((l) => l.aisle === aisle && inIt(l)).map((l) => {
+          const t = byKey['tick:' + week + '|' + l.key];
+          return { key: l.key, name: l.name, qty: l.extraId ? l.qtyText : sumText(l.parts), on: !!(t && t.on), extraId: l.extraId || null, dishes: l.dishes };
+        }).sort((a, b) => a.name.localeCompare(b.name));
+        if (ls.length) groups.push({ aisle, name, lines: ls });
+      }
+      return groups;
+    };
+    const buy = section((l) => !!l.extraId || !PANTRY.includes(l.aisle));
+    const check = section((l) => !l.extraId && PANTRY.includes(l.aisle));
+    for (const g of buy) for (const l of g.lines) { total++; if (!l.on) { left++; toBuy++; } }
+    for (const g of check) for (const l of g.lines) { total++; if (!l.on) left++; }
+    // Days with a dinner planned, in either plan.
+    const dinners = weekDays(week).filter((d) => PEOPLE.some((p) => byKey['day:' + mealId(d.id, p, 'dinner')])).length;
+    return { groups: buy.concat(check), buy, check, staples, left, total, toBuy, dishes, dinners };
   }
 
   const api = {
@@ -487,6 +567,7 @@
     TF, BASE, GF, RES, DOUGH_DEFAULT, TWEAK_STEP, TWEAK_RANGE, doughCalc, grams, ballGrams, pctText, STEPS_NY, STEPS_GF, bakeNote,
     MIX_DAYS, mixDate, pizzaPlan, mixDueToday,
     parseQty, normUnit, amountText, ingredientGroups, scale, itemKey, itemName, sumText, shoppingList,
+    STAPLES, PANTRY, TOPPING_NIGHTS, NIGHT_NAME, isStaple, shortTitle, toppingNights, parseItemLine,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.KitchenLogic = api;

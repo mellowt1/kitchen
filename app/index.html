@@ -203,6 +203,23 @@
             </div>
           </div>
 
+          <div class="card toppings">
+            <div class="top-head">
+              <span class="label">Toppings</span>
+              <div class="seg" role="radiogroup" aria-label="Toppings for">
+                <button type="button" role="radio" data-topk="pizza">Pizza</button>
+                <button type="button" role="radio" data-topk="flammkuchen">Flammkuchen</button>
+              </div>
+            </div>
+            <p class="top-note" id="topNote"></p>
+            <div id="topList" class="top-list"></div>
+            <form id="topForm" class="add" autocomplete="off">
+              <label for="topInput" class="sr">Add a topping</label>
+              <input id="topInput" maxlength="140" enterkeyhint="done">
+              <button type="submit" class="add-btn" aria-label="Add topping">+</button>
+            </form>
+          </div>
+
           <p class="bake"><b>Stone or steel:</b> <span id="bakeNote"></span></p>
 
           <details class="method">

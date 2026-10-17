@@ -261,8 +261,11 @@
   const otherOf = (who) => L.PEOPLE.find((p) => p !== who);
 
   // The sheet for one meal of the person whose plan is on screen; the meal row switches meals.
-  function daySheetHtml(day, meal) {
+  // Dinner only, unless asked: the meal row shows once breakfast or lunch is planned that day,
+  // the sheet is for one of them, or "Breakfast or lunch" is tapped.
+  function daySheetHtml(day, meal, meals) {
     const who = ui.who;
+    const showMeals = meals || meal !== 'dinner' || L.MEALS.some((m) => m !== 'dinner' && dayRec(L.mealId(day, who, m)));
     const id = L.mealId(day, who, meal);
     const rec = dayRec(id);
     const date = L.dateOfDayId(day);
@@ -271,7 +274,7 @@
     const many = recipes().length;
     const other = otherOf(who);
     const html = sheetHead(`${L.PERSON_NAME[who]}, ${L.dayName(date)}`, L.dayMonth(date))
-      + `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-meal="${m}" aria-checked="${m === meal}">${L.MEAL_NAME[m]}${m !== meal && dayRec(L.mealId(day, who, m)) ? '<span class="dot" aria-label=", planned"></span>' : ''}</button>`).join('')}</div>`
+      + (showMeals ? `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-meal="${m}" aria-checked="${m === meal}">${L.MEAL_NAME[m]}${m !== meal && dayRec(L.mealId(day, who, m)) ? '<span class="dot" aria-label=", planned"></span>' : ''}</button>`).join('')}</div>` : '')
       + `<div class="set-row"><span id="srvLabel">${rec && rec.kind === 'pizza' ? 'Pizzas' : 'Servings'}</span><div class="stepper"><button type="button" data-srv="-1" aria-label="Fewer">−</button><span id="srvVal">${servings}</span><button type="button" data-srv="1" aria-label="More">+</button></div></div>`
       + '<span class="label">Write it</span>'
       + `<form class="write" id="writeForm" autocomplete="off"><label class="sr" for="writeInput">${L.MEAL_NAME[meal]}</label><input id="writeInput" maxlength="200" enterkeyhint="done" placeholder="${PLACEHOLDER[meal]}" value="${rec && rec.kind === 'text' ? esc(rec.text) : ''}"><button type="submit" class="btn btn-red">Save</button></form>`
@@ -282,8 +285,9 @@
       + (meal === 'dinner' ? '<button type="button" class="btn btn-soft" data-act="pizza">Pizza night</button>' : '')
       + (rec ? `<button type="button" class="btn btn-line" data-act="copy">Same for ${L.PERSON_NAME[other]}</button>` : '')
       + (rec ? `<button type="button" class="btn btn-line" data-act="clear">Clear ${meal}</button>` : '')
-      + '</div>';
-    return { html, state: { kind: 'day', day, meal, id, servings, touched: false } };
+      + '</div>'
+      + (showMeals ? '' : '<button type="button" class="quiet" data-act="meals">Breakfast or lunch</button>');
+    return { html, state: { kind: 'day', day, meal, id, servings, touched: false, meals: showMeals } };
   }
 
   function openDaySheet(day, meal = 'dinner') {
@@ -292,7 +296,7 @@
   }
 
   function switchMeal(meal) {
-    const v = daySheetHtml(sheet.day, meal);
+    const v = daySheetHtml(sheet.day, meal, sheet.meals);
     sheet = v.state;
     $('sheetBody').innerHTML = v.html;
     const b = $('sheetBody').querySelector(`[data-meal="${meal}"]`);
@@ -326,6 +330,14 @@
     }
     const act = e.target.closest('[data-act]');
     if (!act) return;
+    if (act.dataset.act === 'meals') {
+      const v = daySheetHtml(s.day, s.meal, true);
+      sheet = Object.assign(v.state, { servings: s.servings, touched: s.touched });
+      $('sheetBody').innerHTML = v.html;
+      const b = $('sheetBody').querySelector('[data-meal="breakfast"]');
+      if (b) b.focus({ preventScroll: true });
+      return;
+    }
     if (act.dataset.act === 'pizza') {
       saveDay(s.id, { kind: 'pizza', servings: s.touched || (rec && rec.kind === 'pizza') ? s.servings : dough().count });
       closeSheet();
@@ -364,12 +376,13 @@
     const shown = s.who === 'both' ? ui.who : s.who; // whose plan the free or taken days show
     return sheetHead('Plan it', r ? r.title : '')
       + `<div class="seg" role="radiogroup" aria-label="For">${whoList.map((w) => `<button type="button" role="radio" data-pwho="${w}" aria-checked="${w === s.who}">${w === 'both' ? 'Both' : L.PERSON_NAME[w]}</button>`).join('')}</div>`
-      + `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-pmeal="${m}" aria-checked="${m === s.meal}">${L.MEAL_NAME[m]}</button>`).join('')}</div>`
+      + (s.meals || s.meal !== 'dinner' ? `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-pmeal="${m}" aria-checked="${m === s.meal}">${L.MEAL_NAME[m]}</button>`).join('')}</div>` : '')
       + `<div class="head"><span class="label">Week ${weekNum(week)}, ${esc(L.weekRange(week))}</span><div class="arrows"><button type="button" class="round" data-pweek="-1" aria-label="Previous week">‹</button><button type="button" class="round" data-pweek="1" aria-label="Next week">›</button></div></div>`
       + '<div class="card">' + L.weekDays(week).map((d) => {
         const v = dayView(L.mealId(d.id, shown, s.meal));
         return `<button type="button" class="planday${d.date === t ? ' today' : ''}" data-plan="${d.id}"><span class="day-when"><b>${d.short}</b><span>${d.dayNum}</span></span><span class="now${v.cls === 'empty' ? ' empty' : ''}">${esc(v.cls === 'empty' ? 'Free' : v.title)}</span></button>`;
-      }).join('') + '</div>';
+      }).join('') + '</div>'
+      + (s.meals || s.meal !== 'dinner' ? '' : '<button type="button" class="quiet" data-pmeals>Breakfast or lunch</button>');
   }
 
   function openPlanSheet(recipeId, servings) {
@@ -382,6 +395,11 @@
     const pw = e.target.closest('[data-pweek]');
     if (pw) {
       s.offset += Number(pw.dataset.pweek);
+      $('sheetBody').innerHTML = planSheetHtml();
+      return;
+    }
+    if (e.target.closest('[data-pmeals]')) {
+      s.meals = true;
       $('sheetBody').innerHTML = planSheetHtml();
       return;
     }
@@ -408,21 +426,53 @@
   }
 
   /* ---------- Shopping ---------- */
+  // A small house: "always in the house", on every line that came from a recipe.
+  const HOUSE = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5"/><path d="M6.5 9.5V19h11V9.5"/></svg>';
+  const andList = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
+
+  function shopLineHtml(l, withDishes) {
+    const dishes = withDishes && l.dishes.length ? `<small class="sfor">${esc(l.dishes.join(' · '))}</small>` : '';
+    return `<div class="srow"><button type="button" class="stick" role="checkbox" aria-checked="${l.on}" data-tick="${esc(l.key)}"><span class="box">${l.on ? '✓' : ''}</span><span class="sname">${esc(l.name)}${dishes}</span><span class="sqty">${esc(l.qty)}</span></button>`
+      + (l.extraId
+        ? `<button type="button" class="sdel" data-delx="${l.extraId}" aria-label="Remove ${esc(l.name)}">×</button>`
+        : `<button type="button" class="shouse" data-staple="${esc(l.key)}" data-name="${esc(l.name)}" aria-label="Always have ${esc(l.name)} in the house">${HOUSE}</button>`)
+      + '</div>';
+  }
+  const aislesHtml = (groups, withDishes) => groups.map((g) => `<div class="aisle"><span class="label">${esc(g.name)}</span>`
+    + g.lines.map((l) => shopLineHtml(l, withDishes)).join('') + '</div>').join('');
+  const countLeft = (groups) => groups.reduce((n, g) => n + g.lines.filter((l) => !l.on).length, 0);
+
+  // To buy on top, with the dish each item is for; Check you have folded below it (rice, tins,
+  // spices: look at home first); the staples last, by name only, each with Put back.
   function renderShop() {
     const week = weekAt(weekOffset);
     const list = L.shoppingList(week, db);
     $('shopWeek').textContent = 'Week ' + weekNum(week) + (weekOffset === 1 ? ', next week' : weekOffset === -1 ? ', last week' : '');
-    $('shopLeft').textContent = list.total ? list.left + ' left' : '';
-    $('shopLeftWide').textContent = list.total ? list.left + ' left' : 'Week ' + weekNum(week);
+    const said = list.total ? (list.toBuy ? list.toBuy + ' to buy' : 'All bought') : '';
+    $('shopLeft').textContent = said;
+    $('shopLeftWide').textContent = said || 'Week ' + weekNum(week);
     $('untickAll').hidden = list.left === list.total;
-    if (!list.total) {
+    if (!list.total && !list.staples.length) {
       $('shopList').innerHTML = '<p class="empty-note">Nothing to buy yet. Plan a recipe in the week, or add an item above.</p>';
       return;
     }
-    $('shopList').innerHTML = list.groups.map((g) => `<div class="aisle"><span class="label">${esc(g.name)}</span>`
-      + g.lines.map((l) => `<div class="srow"><button type="button" class="stick" role="checkbox" aria-checked="${l.on}" data-tick="${esc(l.key)}"><span class="box">${l.on ? '✓' : ''}</span><span class="sname">${esc(l.name)}</span><span class="sqty">${esc(l.qty)}</span></button>`
-        + (l.extraId ? `<button type="button" class="sdel" data-delx="${l.extraId}" aria-label="Remove ${esc(l.name)}">×</button>` : '') + '</div>').join('')
-      + '</div>').join('');
+    const sum = list.dishes.length
+      ? `<p class="shop-sum"><span class="sum-n">${plural(list.dinners, 'dinner', 'dinners')} planned</span>For ${andList(list.dishes.map((d) => `<b>${esc(d)}</b>`))}.</p>`
+      : '';
+    const buyLeft = countLeft(list.buy);
+    const checkLeft = countLeft(list.check);
+    const buy = list.buy.length
+      ? `<section class="sec"><h2 class="sec-h">To buy<span class="sec-n">${buyLeft || 'Done'}</span></h2>${aislesHtml(list.buy, true)}</section>`
+      : '';
+    const staples = list.staples.length
+      ? `<div class="staples"><span class="label">Always in the house</span>${list.staples.map((x) => `<div class="staple"><span>${esc(x.name)}</span><button type="button" class="quiet" data-unstaple="${esc(x.key)}" data-name="${esc(x.name)}">Put back</button></div>`).join('')}</div>`
+      : '';
+    const check = list.check.length || staples
+      ? `<details class="sec sec-check" id="checkSec"${ui.checkOpen ? ' open' : ''}><summary class="sec-h">Check you have<span class="sec-n">${list.check.length ? checkLeft || 'Done' : ''}</span></summary>`
+        + (list.check.length ? '<p class="sec-note">Rice, tins, spices and sauces. Tick what is already at home.</p>' : '')
+        + aislesHtml(list.check, false) + staples + '</details>'
+      : '';
+    $('shopList').innerHTML = sum + buy + check;
   }
 
   function tick(key) {
@@ -448,6 +498,13 @@
     put('extra', { id: newId(), week: weekAt(weekOffset), text, qty: '', aisle: L.guessAisle(text) });
     input.value = '';
     input.focus();
+  }
+
+  // In the house as a rule: off the list in every week, until put back.
+  function setStaple(key, name, on) {
+    const prev = db[keyOf('staple', key)];
+    put('staple', { id: key, on });
+    toast(on ? `${name} is under Always in the house.` : `${name} is back on the list.`, () => restore('staple', key, prev));
   }
 
   function removeExtra(id) {
@@ -893,6 +950,7 @@
     $('nWeek').disabled = !usable;
     $('nShop').disabled = !usable;
     $('bakeNote').textContent = L.bakeNote(s.thickness);
+    renderToppings(s);
     $('dSteps').innerHTML = (s.gf ? L.STEPS_GF : L.STEPS_NY).map((x, i) => `<li><span class="n">${i + 1}</span><span>${esc(x)}</span></li>`).join('');
   }
 
@@ -921,11 +979,51 @@
       setDough({ tweaks });
       return;
     }
+    const tk = e.target.closest('[data-topk]');
+    if (tk) { if (tk.dataset.topk !== topKind()) { ui.topKind = tk.dataset.topk; saveUi(); renderDough(); } return; }
+    const dt = e.target.closest('[data-deltop]');
+    if (dt) { removeTopping(Number(dt.dataset.deltop)); return; }
     if (e.target.closest('[data-twreset]') && tweakOpen) {
       const tweaks = Object.assign({}, s.tweaks);
       delete tweaks[tweakOpen];
       setDough({ tweaks });
     }
+  }
+
+  // Toppings: one list for pizza nights and one for flammkuchen, on the shopping list every such night.
+  const topKind = () => (L.TOPPING_NIGHTS.includes(ui.topKind) ? ui.topKind : 'pizza');
+  const toppingsOf = (s) => Object.assign({ pizza: [], flammkuchen: [] }, s.toppings || {});
+  function renderToppings(s) {
+    const k = topKind();
+    for (const b of document.querySelectorAll('[data-topk]')) b.setAttribute('aria-checked', String(b.dataset.topk === k));
+    $('topNote').textContent = k === 'pizza' ? 'On the shopping list every pizza night.' : 'On the shopping list every night with Flammkuchen in the week.';
+    $('topInput').placeholder = k === 'pizza' ? '250 g mozzarella' : '200 g crème fraîche';
+    const list = toppingsOf(s)[k];
+    $('topList').innerHTML = list.length
+      ? list.map((g, i) => `<div class="trow"><span class="tname">${esc(g.item)}</span><span class="tqty">${esc(L.amountText(g.qty, g.unit))}</span><button type="button" class="sdel" data-deltop="${i}" aria-label="Remove ${esc(g.item)}">×</button></div>`).join('')
+      : `<p class="empty-note top-empty">No toppings yet.</p>`;
+  }
+  function addTopping(e) {
+    e.preventDefault();
+    const input = $('topInput');
+    const p = L.parseItemLine(input.value);
+    if (!p.item) return;
+    const item = (p.item.charAt(0).toUpperCase() + p.item.slice(1)).slice(0, 120);
+    const k = topKind();
+    const all = toppingsOf(dough());
+    if (all[k].length >= 30) { toast('That is 30 toppings, the most a list can hold.'); return; }
+    setDough({ toppings: Object.assign({}, all, { [k]: all[k].concat([{ qty: p.qty === null ? null : Math.round(p.qty * 1000) / 1000, unit: p.unit.slice(0, 20), item, aisle: L.guessAisle(item) }]) }) });
+    input.value = '';
+    input.focus();
+  }
+  function removeTopping(i) {
+    const k = topKind();
+    const all = toppingsOf(dough());
+    const g = all[k][i];
+    if (!g) return;
+    const before = all[k];
+    setDough({ toppings: Object.assign({}, all, { [k]: before.filter((_, j) => j !== i) }) });
+    toast(`Removed ${g.item}.`, () => setDough({ toppings: Object.assign({}, toppingsOf(dough()), { [k]: before }) }));
   }
 
   function addNightToWeek() {
@@ -1196,10 +1294,20 @@
   $('shopList').addEventListener('click', (e) => {
     const del = e.target.closest('[data-delx]');
     if (del) { removeExtra(del.dataset.delx); return; }
+    const st1 = e.target.closest('[data-staple]');
+    if (st1) { setStaple(st1.dataset.staple, st1.dataset.name, true); return; }
+    const st0 = e.target.closest('[data-unstaple]');
+    if (st0) { setStaple(st0.dataset.unstaple, st0.dataset.name, false); return; }
     const t = e.target.closest('[data-tick]');
     if (t) tick(t.dataset.tick);
   });
   $('untickAll').addEventListener('click', untickAll);
+  // The list is drawn anew on every sync, so Check you have remembers whether it is open.
+  $('shopList').addEventListener('toggle', (e) => {
+    if (e.target.id !== 'checkSec') return;
+    ui.checkOpen = e.target.open;
+    saveUi();
+  }, true);
 
   $('findRecipe').addEventListener('input', renderRecipes);
   for (const id of ['bookPages', 'recipeFound']) {
@@ -1272,6 +1380,7 @@
   });
   $('nWeek').addEventListener('click', addNightToWeek);
   $('nShop').addEventListener('click', addNightToShopping);
+  $('topForm').addEventListener('submit', addTopping);
 
   $('toastUndo').addEventListener('click', () => { const f = undoFn; hideToast(); if (f) f(); });
   $('syncPill').addEventListener('click', () => { rejectNote = false; flush(); poll(); });

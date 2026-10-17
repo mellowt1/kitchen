@@ -188,15 +188,19 @@ test('shopping: recipes scaled by servings, combined per item, extras, ticks, ai
     'tick:2026-W39|i:onion': { on: true },
   };
   const s = L.shoppingList('2026-W39', byKey);
-  assert.deepEqual(s.groups.map((g) => g.aisle), ['produce', 'tins', 'baking', 'spices']);
+  // to buy: fresh things and the flour added by hand; to check at home: the chickpeas; salt is a staple
+  assert.deepEqual(s.buy.map((g) => g.aisle), ['produce', 'baking']);
+  assert.deepEqual(s.check.map((g) => g.aisle), ['tins']);
+  assert.deepEqual(s.groups.map((g) => g.aisle), ['produce', 'baking', 'tins']);
   assert.deepEqual(s.groups[0].lines.map((l) => [l.name, l.qty, l.on]), [['Onion', '1½', true], ['Spinach', '900 g', false]]);
-  assert.equal(s.groups[1].lines[0].name, 'Chickpeas');
-  assert.equal(s.groups[1].lines[0].qty, '1 tins');
-  assert.equal(s.groups[2].lines[0].extraId, 'x1');
-  assert.equal(s.groups[2].lines[0].qty, '870 g');
-  assert.equal(s.groups[3].lines[0].qty, '');
-  assert.equal(s.total, 5);
-  assert.equal(s.left, 4);
+  assert.equal(s.groups[1].lines[0].extraId, 'x1');
+  assert.equal(s.groups[1].lines[0].qty, '870 g');
+  assert.equal(s.groups[2].lines[0].name, 'Chickpeas');
+  assert.equal(s.groups[2].lines[0].qty, '1 tins');
+  assert.deepEqual(s.staples, [{ key: 'i:salt', name: 'Salt' }]);
+  assert.equal(s.total, 4);
+  assert.equal(s.left, 3);
+  assert.equal(s.toBuy, 2);
   assert.equal(L.shoppingList('2026-W41', byKey).total, 0);
   assert.equal(L.sumText([{ qty: 1, unit: 'tin' }, { qty: 2, unit: 'tins' }, { qty: 100, unit: 'g' }]), '3 tin + 100 g');
   // the larger servings of the two wins; a different meal or a different day is its own pot
@@ -210,6 +214,69 @@ test('shopping: recipes scaled by servings, combined per item, extras, ticks, ai
   assert.equal(L.isOldDayId('2026-W39:mon'), true);
   assert.equal(L.isOldDayId('2026-W39:mon:paul:dinner'), false);
   assert.equal(L.dateOfDayId('2026-W39:sat:olivia:dinner'), '2026-09-26');
+});
+
+test('shopping: buy or check, staples, no water, toppings per night, what it is for', () => {
+  const byKey = {
+    'recipe:seco': { id: 'seco', title: 'Seco de Carne (Ecuadorian Beef Stew)', servings: 2, ingredients: [
+      { qty: 800, unit: 'g', item: 'riblappen', aisle: 'meat' },
+      { qty: 2, unit: 'pieces', item: 'tomato', aisle: 'produce' },
+      { qty: 420, unit: 'ml', item: 'hot water', aisle: 'other' },
+      { qty: 1, unit: 'l', item: 'Water', aisle: 'other' },
+      { qty: 160, unit: 'g', item: 'leftover cooked white rice', aisle: 'pasta' },
+      { qty: 1, unit: 'tsp', item: 'ground cumin', aisle: 'spices' },
+      { qty: null, unit: '', item: 'black pepper', aisle: 'spices' },
+      { qty: 2, unit: 'cloves', item: 'garlic', aisle: 'produce' },
+    ] },
+    'recipe:flamm': { id: 'flamm', title: 'Flammkuchen Dough', servings: 2, ingredients: [
+      { qty: 200, unit: 'g', item: 'all purpose flour', aisle: 'baking' },
+    ] },
+    'day:2026-W42:mon:paul:dinner': { kind: 'recipe', recipeId: 'seco', servings: 2 },
+    'day:2026-W42:tue:paul:dinner': { kind: 'recipe', recipeId: 'flamm', servings: 2 },
+    'day:2026-W42:sat:paul:dinner': { kind: 'pizza', servings: 3 },
+    'day:2026-W42:sat:olivia:dinner': { kind: 'pizza', servings: 3 },
+    'day:2026-W42:sun:olivia:dinner': { kind: 'pizza', servings: 3 },
+    'day:2026-W42:wed:olivia:dinner': { kind: 'text', text: 'Leftovers' },
+    'dough:dough': { night: '2026-10-18', toppings: {
+      pizza: [{ qty: 125, unit: 'g', item: 'Mozzarella', aisle: 'dairy' }, { qty: null, unit: '', item: 'Basil', aisle: 'produce' }],
+      flammkuchen: [{ qty: 200, unit: 'g', item: 'Crème fraîche', aisle: 'dairy' }, { qty: 150, unit: 'g', item: 'Bacon lardons', aisle: 'meat' }],
+    } },
+    'staple:i:garlic': { on: true },
+    'staple:i:black pepper': { on: false }, // put back on the list
+    'tick:2026-W42|i:mozzarella': { on: true },
+  };
+  const s = L.shoppingList('2026-W42', byKey);
+  const names = (gs) => gs.flatMap((g) => g.lines.map((l) => l.name));
+  assert.deepEqual(names(s.buy), ['Basil', 'Tomato', 'Crème fraîche', 'Mozzarella', 'Bacon lardons', 'Riblappen']);
+  assert.deepEqual(names(s.check), ['All purpose flour', 'Black pepper', 'Ground cumin']);
+  assert.deepEqual(s.staples.map((x) => x.name), ['Garlic']);
+  // two pizza nights (Sat in both plans, Sun; the dough's night is that Sunday): toppings twice
+  const line = (n) => s.groups.flatMap((g) => g.lines).find((l) => l.name === n);
+  assert.equal(line('Mozzarella').qty, '250 g');
+  assert.equal(line('Mozzarella').on, true);
+  assert.deepEqual(line('Mozzarella').dishes, ['Pizza night']);
+  assert.equal(line('Crème fraîche').qty, '200 g');
+  assert.deepEqual(line('Riblappen').dishes, ['Seco de Carne']);
+  assert.deepEqual(s.dishes, ['Seco de Carne', 'Flammkuchen Dough', 'Pizza night']);
+  assert.equal(s.dinners, 5);
+  assert.equal(s.toBuy, 5);
+  assert.deepEqual(L.toppingNights('2026-W42', byKey), { pizza: 2, flammkuchen: 1 });
+  // a written flammkuchen night counts and names itself
+  const written = Object.assign({}, byKey, { 'day:2026-W42:tue:paul:dinner': { kind: 'text', text: 'flammkuchen with Olivia' } });
+  assert.ok(L.shoppingList('2026-W42', written).dishes.includes('Flammkuchen'));
+  // without pizza nights the toppings stay off
+  assert.equal(L.shoppingList('2026-W41', byKey).total, 0);
+  assert.equal(L.shortTitle('Pollo Sudado (Ecuadorian Braised Chicken)'), 'Pollo Sudado');
+});
+
+test('typed lines: amount, unit and item', () => {
+  assert.deepEqual(L.parseItemLine('250 g mozzarella'), { qty: 250, unit: 'g', item: 'mozzarella' });
+  assert.deepEqual(L.parseItemLine('250g mozzarella'), { qty: 250, unit: 'g', item: 'mozzarella' });
+  assert.deepEqual(L.parseItemLine('2 balls burrata'), { qty: 2, unit: 'balls', item: 'burrata' });
+  assert.deepEqual(L.parseItemLine('1/2 tin tomatoes'), { qty: 0.5, unit: 'tin', item: 'tomatoes' });
+  assert.deepEqual(L.parseItemLine('2 red onions'), { qty: 2, unit: '', item: 'red onions' });
+  assert.deepEqual(L.parseItemLine('Basil'), { qty: null, unit: '', item: 'Basil' });
+  assert.deepEqual(L.parseItemLine('  fresh  basil '), { qty: null, unit: '', item: 'fresh basil' });
 });
 
 // The Worker keeps its own copy of titleCase. If the two ever differ, the page's fixTitles and the
