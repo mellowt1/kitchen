@@ -195,6 +195,9 @@
   }
 
   /* ---------- Week ---------- */
+  let railWeek = ''; // the week whose tickets are on the rail; a new one drops them in again
+  // What a ticket says on its right: "× 2" for servings, "2 pizzas" as it is.
+  const sideText = (side) => (/^d+$/.test(side) ? '× ' + side : side);
   function renderWeek() {
     const week = weekAt(weekOffset);
     const t = today();
@@ -210,23 +213,43 @@
       const named = meals.length > 1;
       // His calendar has something over dinner that day (set by the hub; no title reaches here).
       const out = st.away.includes(d.date) ? L.PERSON_NAME.paul + ' out' : '';
-      const lines = meals.map((m) => {
-        const v = dayView(L.mealId(d.id, ui.who, m));
-        // Dinner alone takes the row's full width; the meal names only show beside each other.
+      const views = meals.map((m) => dayView(L.mealId(d.id, ui.who, m)));
+      // A ticket on the rail: the meal's name over what it is once there is more than dinner;
+      // recipe titles without their bracket, so they fit half the width.
+      const lines = meals.map((m, i) => {
+        const v = views[i];
+        const title = v.cls ? v.title : L.shortTitle(v.title);
         return `<span class="meal meal-${m}${named ? '' : ' solo'}" data-m="${m}">${named ? `<span class="meal-name">${L.MEAL_NAME[m]}</span>` : ''}`
-          + `<span class="meal-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(v.title)}</span>${v.veg ? VEG : ''}`
+          + `<span class="meal-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(title)}</span>${v.veg ? VEG : ''}`
           + `${m === 'dinner' && out ? `<span class="away">${esc(out)}</span>` : ''}</span>`
-          + `<span class="day-side"><span class="srv">${esc(v.side)}</span></span></span>`;
+          + `<span class="day-side"><span class="srv">${esc(sideText(v.side))}</span></span></span>`;
       });
-      const said = meals.map((m) => L.MEAL_NAME[m] + ' ' + dayView(L.mealId(d.id, ui.who, m)).title).join(', ') + (out ? ', ' + out : '');
-      return `<button type="button" class="day${isToday ? ' today' : ''}" data-day="${d.id}"${isToday ? ' aria-current="date"' : ''} aria-label="${esc(d.name + ' ' + d.dayNum + ': ' + said)}">`
-        + `<span class="day-when"><b>${d.short}</b><span>${d.dayNum}</span></span>`
+      const empty = views.every((v) => v.cls === 'empty');
+      const said = meals.map((m, i) => L.MEAL_NAME[m] + ' ' + views[i].title).join(', ') + (out ? ', ' + out : '');
+      return `<button type="button" class="day${isToday ? ' today' : ''}${empty ? ' empty' : ''}" data-day="${d.id}"${isToday ? ' aria-current="date"' : ''} aria-label="${esc(d.name + ' ' + d.dayNum + ': ' + said)}">`
+        + `<span class="day-when"><b>${d.short}</b><span>${d.dayNum}</span>${isToday ? '<span class="tk-flag" aria-hidden="true">Tonight</span>' : ''}</span>`
         + `<span class="day-what">${lines.join('')}</span>`
         + '</button>';
-    }).join('');
+    }).join('')
+      + totalTicket(week);
+    if (railWeek !== week + ui.who) {
+      railWeek = week + ui.who;
+      $('days').classList.remove('drop');
+      void $('days').offsetWidth; // start the drop again
+      $('days').classList.add('drop');
+    }
     const due = L.mixDueToday(pizzaNights(), dough().gf, t);
     $('mixBanner').hidden = !due;
     if (due) $('mixText').innerHTML = `<b>Mix the dough today</b> for ${esc(L.dayName(due))}'s pizza night.`;
+  }
+
+  // The eighth slot on the rail: the week's total, which opens Shopping (on a laptop the list
+  // is beside the week, so it hides there).
+  function totalTicket(week) {
+    const list = L.shoppingList(week, db);
+    const n = L.weekDays(week).filter((d) => L.PEOPLE.some((p) => dayRec(L.mealId(d.id, p, 'dinner')))).length;
+    const buy = list.total ? (list.toBuy ? plural(list.toBuy, 'thing', 'things') + ' to buy' : 'All bought') : 'Shopping';
+    return `<button type="button" class="tk-total" data-goshop><span><b>${n}</b><small>${n === 1 ? 'dinner' : 'dinners'} planned</small></span><span class="tk-go">${esc(buy)}</span></button>`;
   }
 
   /* ---------- Sheet ---------- */
@@ -249,7 +272,7 @@
     if (sheetOpener && document.contains(sheetOpener)) sheetOpener.focus({ preventScroll: true });
   }
 
-  const sheetHead = (label, title) => `<div class="sheet-head"><div class="titles"><span class="label">${esc(label)}</span><h2 id="sheetTitle">${esc(title)}</h2></div><button type="button" class="round" data-close aria-label="Close">×</button></div>`;
+  const sheetHead = (label, title) => `<div class="sheet-head"><div class="titles"><h2 id="sheetTitle">${esc(title)}</h2><span class="label">${esc(label)}</span></div><button type="button" class="round" data-close aria-label="Close">×</button></div>`;
 
   // The recipes planned most (any week, either plan), the latest first among equals; the one on
   // the meal now leads. A week is planned from about ten recipes, so these come before the A to Z.
@@ -581,6 +604,8 @@
     $('recipesHome').hidden = which !== 'home';
     $('recipeView').hidden = which !== 'view';
     $('recipeForm').hidden = which !== 'form';
+    // Back on the list at the same spot: the index keeps the letter it had, not a fresh guess.
+    if (which === 'home') holdSpy = Date.now() + 300;
     window.scrollTo(0, which === 'home' ? listY : 0);
   }
 
@@ -671,7 +696,7 @@
   // As the list scrolls, the index marks the letter whose page is at the top of the screen,
   // or the last one once the end of the list is reached.
   function spy() {
-    if (Date.now() < holdSpy || $('recipeBook').hidden || $('recipesHome').hidden || !$('v-recipes').classList.contains('on')) return;
+    if (Date.now() < holdSpy || openRecipe !== null || $('recipeBook').hidden || $('recipesHome').hidden || !$('v-recipes').classList.contains('on')) return;
     const pages = $('bookPages').children;
     if (!pages.length) return;
     let at = pages[0].dataset.letter;
@@ -757,12 +782,14 @@
     }
   }
 
+  // Each section ("For the marinade") under its own small heading, in the order written.
+  const ingsHtml = (r, factor) => L.ingredientGroups(r.ingredients).map((sec) => (sec.group ? `<h3 class="ing-sub">${esc(sec.group)}</h3>` : '')
+    + '<ul class="ings">' + sec.items.map((g) => `<li><span class="q">${esc(L.amountText(L.scale(g.qty, factor), g.unit))}</span><span>${esc(g.item)}</span></li>`).join('') + '</ul>').join('');
+
   function renderRecipeView(r) {
     const n = openServings || r.servings;
     const factor = n / r.servings;
-    // Each section ("For the marinade") under its own small heading, in the order written.
-    const ings = L.ingredientGroups(r.ingredients).map((sec) => (sec.group ? `<h3 class="ing-sub">${esc(sec.group)}</h3>` : '')
-      + '<ul class="ings">' + sec.items.map((g) => `<li><span class="q">${esc(L.amountText(L.scale(g.qty, factor), g.unit))}</span><span>${esc(g.item)}</span></li>`).join('') + '</ul>').join('');
+    const ings = ingsHtml(r, factor);
     const steps = r.steps.map((s, i) => `<li><span class="n">${i + 1}</span><span>${esc(s)}</span></li>`).join('');
     const fd = dayRecipeOpen() ? fromDay : null;
     $('recipeView').innerHTML = '<div class="detail">'
@@ -771,17 +798,62 @@
         : '<button type="button" class="round" data-back aria-label="Back to recipes" style="font-size:20px">‹</button>')
       + '<div class="rcard">'
       + (r.veg ? VEG : '')
-      + `<h1>${esc(r.title)}</h1>`
+      // The name in big letters; what is in its brackets ("Peruvian Beef Stir-Fry") under it.
+      + `<h1>${esc(L.shortTitle(r.title))}</h1>${/\((.+?)\)/.test(r.title) ? `<p class="h1-sub">${esc(r.title.match(/\((.+?)\)/)[1])}</p>` : ''}`
       + `<div class="rmeta-row"><div class="stepper"><button type="button" data-rsrv="-1" aria-label="Fewer servings">−</button><span>${n}</span><button type="button" data-rsrv="1" aria-label="More servings">+</button></div><span>servings</span>${r.time ? `<span>${esc(r.time)}</span>` : ''}</div>`
       + (ings ? `<span class="label">Ingredients</span>${ings}` : '')
       + (steps ? `<span class="label">Method</span><ol class="steps">${steps}</ol>` : '')
       + (r.notes ? `<span class="label">Notes</span><p class="notes">${esc(r.notes)}</p>` : '')
       + '</div>'
-      + '<div class="actions"><button type="button" class="btn btn-red grow" data-planit>Plan it</button><button type="button" class="btn btn-line" data-edit>Edit</button></div>'
+      + '<div class="actions">'
+      + (r.steps.length ? '<button type="button" class="btn btn-ink grow" data-cook>Cook</button>' : '')
+      + '<button type="button" class="btn btn-red grow" data-planit>Plan it</button><button type="button" class="btn btn-line" data-edit>Edit</button></div>'
       + (confirmDelete
         ? `<div class="confirm" role="alert"><span>Delete ${esc(r.title)} for good? Days it is planned on keep its name.</span><div class="actions"><button type="button" class="btn btn-red grow" data-delyes>Delete</button><button type="button" class="btn btn-line" data-delno>Keep it</button></div></div>`
         : '<button type="button" class="link-red" data-del>Delete this recipe</button>')
       + '</div>';
+  }
+
+  /* ---------- Cook ---------- */
+  // The recipe at arm's length: what to get out first, then one step per screen, swiped up.
+  // The screen stays awake while it is open (where the browser allows it).
+  let cookOpener = null;
+  let wake = null;
+  async function keepAwake(on) {
+    try {
+      if (on && 'wakeLock' in navigator) wake = await navigator.wakeLock.request('screen');
+      else if (!on && wake) { await wake.release(); wake = null; }
+    } catch (err) { wake = null; }
+  }
+  function openCook(r, n) {
+    const steps = r.steps;
+    const next = (i) => (i < steps.length ? `<p class="cook-next">Next: ${i + 1}. ${esc(steps[i].length > 70 ? steps[i].slice(0, 68).trim() + '…' : steps[i])}</p>` : '');
+    $('cook').innerHTML = '<div class="cook-top">'
+      + `<button type="button" class="round" data-cookx aria-label="Close">×</button><span class="cook-title" id="cookTitle">${esc(L.shortTitle(r.title))}</span><span class="cook-at" id="cookAt">Get ready</span></div>`
+      + '<div class="cook-pages" id="cookPages">'
+      + `<section class="cook-page"><span class="label">Get ready · ${plural(n, 'serving', 'servings')}</span>${ingsHtml(r, n / r.servings) || '<p class="cook-text">No ingredients written down.</p>'}${next(0)}</section>`
+      + steps.map((t, i) => `<section class="cook-page"><span class="cook-n" aria-hidden="true">${i + 1}</span><p class="cook-text"><span class="sr">Step ${i + 1} of ${steps.length}: </span>${esc(t)}</p>`
+        + (i === steps.length - 1 ? '<button type="button" class="btn btn-ink cook-done" data-cookx>Done</button>' : next(i + 1)) + '</section>').join('')
+      + '</div>';
+    cookOpener = document.activeElement;
+    $('cook').hidden = false;
+    $('cook').focus({ preventScroll: true });
+    keepAwake(true);
+  }
+  function closeCook() {
+    if ($('cook').hidden) return;
+    $('cook').hidden = true;
+    $('cook').innerHTML = '';
+    keepAwake(false);
+    if (cookOpener && document.contains(cookOpener)) cookOpener.focus({ preventScroll: true });
+  }
+  function cookSpot() {
+    const box = $('cookPages');
+    if (!box) return;
+    let at = 0;
+    [...box.children].forEach((p, i) => { if (p.offsetTop - box.offsetTop <= box.scrollTop + 20) at = i; });
+    const total = box.children.length - 1;
+    $('cookAt').textContent = at ? `Step ${at} of ${total}` : 'Get ready';
   }
 
   function showRecipe(id) {
@@ -812,6 +884,7 @@
       renderRecipeView(r);
       return;
     }
+    if (e.target.closest('[data-cook]')) { openCook(r, openServings || r.servings); return; }
     if (e.target.closest('[data-planit]')) { openPlanSheet(r.id, openServings || r.servings); return; }
     if (e.target.closest('[data-edit]')) { openForm(r.id); return; }
     if (e.target.closest('[data-del]')) { confirmDelete = true; renderRecipeView(r); return; }
@@ -1293,6 +1366,7 @@
   });
   // A meal with a recipe opens the recipe; anything else opens the sheet to plan it.
   $('days').addEventListener('click', (e) => {
+    if (e.target.closest('[data-goshop]')) { setTab('shop'); return; }
     const b = e.target.closest('[data-day]');
     if (!b) return;
     const line = e.target.closest('[data-m]');
@@ -1318,8 +1392,13 @@
     }
   });
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('cook').hidden) { e.preventDefault(); closeCook(); return; }
     if (e.key === 'Escape' && sheet) { e.preventDefault(); closeSheet(); }
   });
+  $('cook').addEventListener('click', (e) => { if (e.target.closest('[data-cookx]')) closeCook(); });
+  $('cook').addEventListener('scroll', cookSpot, true);
+  // The lock lapses when the phone locks or the app goes to the background; take it again.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !$('cook').hidden) keepAwake(true); });
 
   $('addForm').addEventListener('submit', addExtra);
   $('shopList').addEventListener('click', (e) => {
