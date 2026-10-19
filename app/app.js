@@ -197,7 +197,7 @@
   /* ---------- Week ---------- */
   let railWeek = ''; // the week whose tickets are on the rail; a new one drops them in again
   // What a ticket says on its right: "× 2" for servings, "2 pizzas" as it is.
-  const sideText = (side) => (/^d+$/.test(side) ? '× ' + side : side);
+  const sideText = (side) => (/^\d+$/.test(side) ? '× ' + side : side);
   function renderWeek() {
     const week = weekAt(weekOffset);
     const t = today();
@@ -247,9 +247,9 @@
   // is beside the week, so it hides there).
   function totalTicket(week) {
     const list = L.shoppingList(week, db);
-    const n = L.weekDays(week).filter((d) => L.PEOPLE.some((p) => dayRec(L.mealId(d.id, p, 'dinner')))).length;
+    const n = L.weekDays(week).filter((d) => dayRec(L.mealId(d.id, ui.who, 'dinner'))).length;
     const buy = list.total ? (list.toBuy ? plural(list.toBuy, 'thing', 'things') + ' to buy' : 'All bought') : 'Shopping';
-    return `<button type="button" class="tk-total" data-goshop><span><b>${n}</b><small>${n === 1 ? 'dinner' : 'dinners'} planned</small></span><span class="tk-go">${esc(buy)}</span></button>`;
+    return `<button type="button" class="tk-total" data-goshop><span><b>${n}</b><small>${n === 1 ? 'dinner' : 'dinners'} for ${esc(L.PERSON_NAME[ui.who])}</small></span><span class="tk-go">${esc(buy)}<svg width="18" height="18" class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></span></button>`;
   }
 
   /* ---------- Sheet ---------- */
@@ -272,7 +272,7 @@
     if (sheetOpener && document.contains(sheetOpener)) sheetOpener.focus({ preventScroll: true });
   }
 
-  const sheetHead = (label, title) => `<div class="sheet-head"><div class="titles"><h2 id="sheetTitle">${esc(title)}</h2><span class="label">${esc(label)}</span></div><button type="button" class="round" data-close aria-label="Close">×</button></div>`;
+  const sheetHead = (label, title) => `<div class="sheet-head"><div class="titles"><h2 id="sheetTitle">${esc(title)}</h2><span class="label">${esc(label)}</span></div><button type="button" class="round" data-close aria-label="Close"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>`;
 
   // The recipes planned most (any week, either plan), the latest first among equals; the one on
   // the meal now leads. A week is planned from about ten recipes, so these come before the A to Z.
@@ -297,7 +297,7 @@
     const list = f ? all.filter((r) => r.title.toLowerCase().includes(f)) : often.length ? often : all;
     if (!list.length) return `<p class="empty-note">${all.length ? 'No recipe with that name.' : 'No recipes yet. Add them in Recipes.'}</p>`;
     return list.map((r) => `<button type="button" class="pick${r.id === curId ? ' cur' : ''}" data-pick="${r.id}"><span>${esc(r.title)}</span>${r.veg ? VEG : r.time ? `<small>${esc(r.time)}</small>` : ''}</button>`).join('')
-      + (often.length ? `<button type="button" class="pick pick-all" data-allpicks>All ${all.length} recipes<span aria-hidden="true">›</span></button>` : '');
+      + (often.length ? `<button type="button" class="pick pick-all" data-allpicks>All ${all.length} recipes<svg width="18" height="18" class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button>` : '');
   }
 
   const PLACEHOLDER = { breakfast: 'Overnight oats, toast', lunch: 'Leftovers, a sandwich', dinner: 'Leftovers, dinner at friends' };
@@ -430,7 +430,7 @@
     return sheetHead('Plan it', r ? r.title : '')
       + `<div class="seg" role="radiogroup" aria-label="For">${whoList.map((w) => `<button type="button" role="radio" data-pwho="${w}" aria-checked="${w === s.who}">${w === 'both' ? 'Both' : L.PERSON_NAME[w]}</button>`).join('')}</div>`
       + (s.meals || s.meal !== 'dinner' ? `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-pmeal="${m}" aria-checked="${m === s.meal}">${L.MEAL_NAME[m]}</button>`).join('')}</div>` : '')
-      + `<div class="head"><span class="label">Week ${weekNum(week)}, ${esc(L.weekRange(week))}</span><div class="arrows"><button type="button" class="round" data-pweek="-1" aria-label="Previous week">‹</button><button type="button" class="round" data-pweek="1" aria-label="Next week">›</button></div></div>`
+      + `<div class="head"><span class="label">Week ${weekNum(week)}, ${esc(L.weekRange(week))}</span><div class="arrows"><button type="button" class="round" data-pweek="-1" aria-label="Previous week"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-chev-l"/></svg></button><button type="button" class="round" data-pweek="1" aria-label="Next week"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-chev-r"/></svg></button></div></div>`
       + '<div class="card">' + L.weekDays(week).map((d) => {
         const v = dayView(L.mealId(d.id, shown, s.meal));
         return `<button type="button" class="planday${d.date === t ? ' today' : ''}" data-plan="${d.id}"><span class="day-when"><b>${d.short}</b><span>${d.dayNum}</span></span><span class="now${v.cls === 'empty' ? ' empty' : ''}">${esc(v.cls === 'empty' ? 'Free' : v.title)}</span></button>`;
@@ -487,7 +487,7 @@
     const dishes = withDishes && l.dishes.length ? `<small class="sfor">${esc(l.dishes.join(' · '))}</small>` : '';
     return `<div class="srow"><button type="button" class="stick" role="checkbox" aria-checked="${l.on}" data-tick="${esc(l.key)}"><span class="box">${l.on ? '✓' : ''}</span><span class="sname">${esc(l.name)}${dishes}</span><span class="sqty">${esc(l.qty)}</span></button>`
       + (l.extraId
-        ? `<button type="button" class="sdel" data-delx="${l.extraId}" aria-label="Remove ${esc(l.name)}">×</button>`
+        ? `<button type="button" class="sdel" data-delx="${l.extraId}" aria-label="Remove ${esc(l.name)}"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>`
         : withDishes ? ''
         : `<button type="button" class="always" data-staple="${esc(l.key)}" data-name="${esc(l.name)}" aria-label="Always have ${esc(l.name)}: stop listing it">Always have</button>`)
       + '</div>';
@@ -794,8 +794,8 @@
     const fd = dayRecipeOpen() ? fromDay : null;
     $('recipeView').innerHTML = '<div class="detail">'
       + (fd
-        ? `<div class="day-bar"><button type="button" class="round" data-back aria-label="Back to the week" style="font-size:20px">‹</button><span class="day-bar-what">${esc(L.dayName(L.dateOfDayId(fd.day)))}'s ${fd.meal}</span><button type="button" class="btn btn-line btn-mid" data-change>Change</button></div>`
-        : '<button type="button" class="round" data-back aria-label="Back to recipes" style="font-size:20px">‹</button>')
+        ? `<div class="day-bar"><button type="button" class="round" data-back aria-label="Back to the week"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-chev-l"/></svg></button><span class="day-bar-what">${esc(L.dayName(L.dateOfDayId(fd.day)))}'s ${fd.meal}</span><button type="button" class="btn btn-line btn-mid" data-change>Change</button></div>`
+        : '<button type="button" class="round" data-back aria-label="Back to recipes"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-chev-l"/></svg></button>')
       + '<div class="rcard">'
       + (r.veg ? VEG : '')
       // The name in big letters; what is in its brackets ("Peruvian Beef Stir-Fry") under it.
@@ -819,6 +819,7 @@
   // The recipe at arm's length: what to get out first, then one step per screen, swiped up.
   // The screen stays awake while it is open (where the browser allows it).
   let cookOpener = null;
+  let cookServings = '';
   let wake = null;
   async function keepAwake(on) {
     try {
@@ -830,13 +831,15 @@
     const steps = r.steps;
     const next = (i) => (i < steps.length ? `<p class="cook-next">Next: ${i + 1}. ${esc(steps[i].length > 70 ? steps[i].slice(0, 68).trim() + '…' : steps[i])}</p>` : '');
     $('cook').innerHTML = '<div class="cook-top">'
-      + `<button type="button" class="round" data-cookx aria-label="Close">×</button><span class="cook-title" id="cookTitle">${esc(L.shortTitle(r.title))}</span><span class="cook-at" id="cookAt">Get ready</span></div>`
+      + `<button type="button" class="round" data-cookx aria-label="Close"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-close"/></svg></button><span class="cook-title" id="cookTitle">${esc(L.shortTitle(r.title))}</span><span class="cook-at" id="cookAt"></span></div>`
       + '<div class="cook-pages" id="cookPages">'
-      + `<section class="cook-page"><span class="label">Get ready · ${plural(n, 'serving', 'servings')}</span>${ingsHtml(r, n / r.servings) || '<p class="cook-text">No ingredients written down.</p>'}${next(0)}</section>`
+      + `<section class="cook-page"><span class="label">Get ready</span>${ingsHtml(r, n / r.servings) || '<p class="cook-text">No ingredients written down.</p>'}${next(0)}</section>`
       + steps.map((t, i) => `<section class="cook-page"><span class="cook-n" aria-hidden="true">${i + 1}</span><p class="cook-text"><span class="sr">Step ${i + 1} of ${steps.length}: </span>${esc(t)}</p>`
         + (i === steps.length - 1 ? '<button type="button" class="btn btn-ink cook-done" data-cookx>Done</button>' : next(i + 1)) + '</section>').join('')
       + '</div>';
     cookOpener = document.activeElement;
+    cookServings = plural(n, 'serving', 'servings');
+    $('cookAt').textContent = cookServings;
     $('cook').hidden = false;
     $('cook').focus({ preventScroll: true });
     keepAwake(true);
@@ -854,7 +857,7 @@
     let at = 0;
     [...box.children].forEach((p, i) => { if (p.offsetTop - box.offsetTop <= box.scrollTop + 20) at = i; });
     const total = box.children.length - 1;
-    $('cookAt').textContent = at ? `Step ${at} of ${total}` : 'Get ready';
+    $('cookAt').textContent = at ? `Step ${at} of ${total}` : cookServings;
   }
 
   function showRecipe(id) {
@@ -917,7 +920,7 @@
     row.innerHTML = `<input class="i-qty" inputmode="decimal" placeholder="2" aria-label="Amount, row ${n}">`
       + `<input class="i-unit" list="units" placeholder="g" maxlength="20" aria-label="Unit, row ${n}" autocapitalize="off">`
       + `<input class="i-item" placeholder="Item" maxlength="120" aria-label="Item, row ${n}">`
-      + `<button type="button" class="ing-del" aria-label="Remove row ${n}">×</button>`
+      + `<button type="button" class="ing-del" aria-label="Remove row ${n}"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>`
       + `<select class="i-aisle" aria-label="Aisle, row ${n}">${L.AISLES.map(([k, name]) => `<option value="${k}">${esc(name)}</option>`).join('')}</select>`;
     row.querySelector('.i-qty').value = g && g.qty != null ? String(Math.round(g.qty * 1000) / 1000) : '';
     row.querySelector('.i-unit').value = (g && g.unit) || '';
@@ -934,7 +937,7 @@
     const row = document.createElement('div');
     row.className = 'ing-sec';
     row.innerHTML = '<input class="s-name" placeholder="For the marinade" maxlength="60" aria-label="Section name">'
-      + '<button type="button" class="ing-del" aria-label="Remove this section heading">×</button>';
+      + '<button type="button" class="ing-del" aria-label="Remove this section heading"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>';
     row.querySelector('.s-name').value = name || '';
     $('fIngredients').appendChild(row);
     return row;
@@ -1105,7 +1108,7 @@
     $('topInput').placeholder = k === 'pizza' ? '250 g mozzarella' : '200 g crème fraîche';
     const list = toppingsOf(s)[k];
     $('topList').innerHTML = list.length
-      ? list.map((g, i) => `<div class="trow"><span class="tname">${esc(g.item)}</span><span class="tqty">${esc(L.amountText(g.qty, g.unit))}</span><button type="button" class="sdel" data-deltop="${i}" aria-label="Remove ${esc(g.item)}">×</button></div>`).join('')
+      ? list.map((g, i) => `<div class="trow"><span class="tname">${esc(g.item)}</span><span class="tqty">${esc(L.amountText(g.qty, g.unit))}</span><button type="button" class="sdel" data-deltop="${i}" aria-label="Remove ${esc(g.item)}"><svg width="20" height="20" class="ico" aria-hidden="true"><use href="#i-close"/></svg></button></div>`).join('')
       : `<p class="empty-note top-empty">No toppings yet.</p>`;
   }
   function addTopping(e) {
