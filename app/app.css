@@ -6,8 +6,9 @@
   --card: #FBF8F2;
   --ink: #2B2420;
   --muted: #6E625A;
-  --muted2: #8C7F75;
-  --faint: #B3A89D;
+  --muted2: #74685F; /* small text: 4.5:1 on the ground, the card and today's row */
+  --faint: #8F8378; /* lines and boxes: 3:1 on the ground */
+  --today: #B23A26;
   --rule: #E2D9CB;
   --row: #EDE5D8;
   --shoprow: #E8DFD2;
@@ -99,16 +100,17 @@ a:hover { color: #2C4F29; }
 .day.today { background: var(--seg); }
 .day-when { display: flex; flex-direction: column; line-height: 1.15; }
 .day-when b { font-size: 15px; font-weight: 700; }
-.day.today .day-when b { color: var(--tomato); }
+.day.today .day-when b { color: var(--today); }
 .day-when span { font-size: 13px; color: var(--muted2); }
 .day-what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 /* One line per meal: the meal's name, what it is, servings. Dinner is the big one. */
 .meal { display: grid; grid-template-columns: 66px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; }
+.meal.solo { grid-template-columns: minmax(0, 1fr) auto; }
 .meal-what { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .meal-name { font-size: 13px; color: var(--muted2); white-space: nowrap; }
 .day-title { font-size: 17px; overflow-wrap: anywhere; }
 .meal:not(.meal-dinner) .day-title { font-size: 15px; color: var(--muted); }
-.day-title.empty { color: var(--faint); }
+.day-title.empty { color: var(--muted2); }
 .day-title.pizza { color: var(--tomato); font-family: var(--serif); }
 .day-title.gone { color: var(--muted2); font-style: italic; }
 .day-side { font-size: 13px; color: var(--muted2); white-space: nowrap; }
@@ -142,12 +144,11 @@ a:hover { color: #2C4F29; }
 .stick[aria-checked="true"] .sname { color: var(--faint); text-decoration: line-through; }
 .sname { overflow-wrap: anywhere; }
 .sqty { font-size: 14px; color: var(--muted2); text-align: right; }
-.sdel { width: 36px; height: 40px; margin-right: -8px; border: 0; background: none; color: var(--faint); font-size: 20px; padding: 0; flex-shrink: 0; }
+.sdel { width: 44px; height: 44px; margin-right: -10px; border: 0; background: none; color: var(--faint); font-size: 20px; padding: 0; flex-shrink: 0; }
 .empty-note { margin: 0; padding: 18px 0; font-size: 15px; line-height: 1.5; color: var(--muted); }
 .sname small.sfor { display: block; margin-top: 1px; font-size: 13px; color: var(--muted2); }
 .stick[aria-checked="true"] .sfor { text-decoration: none; color: var(--faint); }
-.shouse { width: 36px; height: 40px; margin-right: -8px; border: 0; background: none; padding: 0; flex-shrink: 0; color: var(--faint); display: flex; align-items: center; justify-content: center; }
-.shouse svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.always { min-height: 44px; padding: 0 0 0 12px; border: 0; background: none; flex-shrink: 0; white-space: nowrap; font-size: 14px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--faint); }
 .shop-sum { margin: 0; padding: 12px 14px; background: var(--card); border: 1px solid var(--rule); border-radius: 14px; font-size: 15px; line-height: 1.45; color: var(--muted); }
 .shop-sum b { font-weight: 600; color: var(--ink); }
 .sum-n { display: block; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--brown); margin-bottom: 2px; }
@@ -175,7 +176,7 @@ a:hover { color: #2C4F29; }
 .btn-mid { min-height: 44px; padding: 0 14px; font-size: 15px; }
 .grow { flex-grow: 1; }
 .actions { display: flex; gap: 10px; }
-.link-red { align-self: flex-start; border: 0; background: none; padding: 6px 0; color: var(--tomato); font-size: 15px; }
+.link-red { align-self: flex-start; min-height: 44px; margin-top: 4px; border: 0; background: none; padding: 0; color: var(--tomato); font-size: 15px; }
 
 /* ---------- Recipes ---------- */
 #recipesHome { display: flex; flex-direction: column; gap: 16px; }
@@ -192,7 +193,7 @@ a:hover { color: #2C4F29; }
 .search-input::placeholder { color: var(--muted); }
 /* The list is an index: each letter in the serif over its own card of recipes, one letter
  * after another, with a thumb index down the right edge. */
-.book { display: grid; grid-template-columns: minmax(0, 1fr) 28px; column-gap: 6px; margin-right: -16px; }
+.book { display: grid; grid-template-columns: minmax(0, 1fr) 34px; column-gap: 6px; margin-right: -16px; }
 .pages { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .idx { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .idx-letter { margin: 0; padding-left: 2px; font-family: var(--serif); font-weight: 400; font-size: 28px; line-height: 1; color: var(--tomato); }
@@ -219,7 +220,7 @@ a:hover { color: #2C4F29; }
   border-radius: 9px 0 0 9px; background: none; font-family: var(--serif); font-size: 13px; line-height: 1; color: #5E4B3A;
 }
 .thumb.on { background: #B23A26; color: #fff; }
-.thumb.empty { color: #C7B9A4; }
+.thumb.empty { color: var(--faint); }
 .thumb:focus-visible { outline-offset: -2px; }
 .thumb-bubble {
   position: fixed; z-index: 30; width: 64px; height: 64px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
@@ -236,8 +237,8 @@ a:hover { color: #2C4F29; }
 .rcard .pillv { font-size: 12px; padding: 2px 10px; }
 .rcard h1 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 32px; line-height: 1.1; overflow-wrap: anywhere; }
 .rmeta-row { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
-.stepper { display: inline-flex; align-items: center; gap: 4px; background: var(--seg); border-radius: 999px; padding: 3px; flex-shrink: 0; }
-.stepper button { width: 38px; height: 38px; border: 0; border-radius: 999px; background: none; font-size: 20px; color: var(--muted); padding: 0; }
+.stepper { display: inline-flex; align-items: center; gap: 4px; background: var(--seg); border-radius: 999px; padding: 1px; flex-shrink: 0; }
+.stepper button { width: 42px; height: 42px; border: 0; border-radius: 999px; background: none; font-size: 20px; color: var(--muted); padding: 0; }
 .stepper span { min-width: 24px; text-align: center; font-weight: 600; color: var(--ink); }
 .settings .stepper span { min-width: 40px; }
 .rcard .label { margin-top: 10px; }
@@ -261,7 +262,7 @@ a:hover { color: #2C4F29; }
   width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 12px; background: #fff; font-size: 16px;
 }
 .field textarea { resize: vertical; line-height: 1.45; }
-.field input::placeholder, .field textarea::placeholder, .ing input::placeholder, .find::placeholder, .write input::placeholder { color: var(--faint); }
+.field input::placeholder, .field textarea::placeholder, .ing input::placeholder, .find::placeholder, .write input::placeholder { color: var(--muted2); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .check-row { display: flex; justify-content: space-between; align-items: center; min-height: 52px; font-size: 16px; }
 .check-row input { width: 22px; height: 22px; accent-color: var(--basil); margin: 0; }
@@ -272,7 +273,7 @@ a:hover { color: #2C4F29; }
 /* A section heading in the form, above the rows it holds. */
 .ing-sec { display: grid; grid-template-columns: minmax(0, 1fr) 36px; gap: 6px; margin-top: 8px; }
 .ing-sec input { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--seg); font-size: 16px; font-weight: 600; color: var(--brown); }
-.ing-sec input::placeholder { color: var(--faint); }
+.ing-sec input::placeholder { color: var(--muted2); }
 .ing-adds { display: flex; flex-wrap: wrap; gap: 8px; }
 .ing-del { width: 36px; height: 44px; border: 0; background: none; color: var(--faint); font-size: 20px; padding: 0; }
 .form-error { margin: 0; color: var(--tomato); font-size: 15px; }
@@ -288,12 +289,13 @@ a:hover { color: #2C4F29; }
 .big { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; background: var(--card); border: 1px solid var(--rule); border-radius: 16px; }
 .big-red { background: var(--tomato); border-color: var(--tomato); color: #fff; }
 .big-label { font-size: 13px; color: var(--muted); }
-.big-red .big-label { color: #fff; opacity: .9; }
+.big-red .big-label { color: #fff; }
 .big-num { font-family: var(--serif); font-size: 36px; line-height: 1.1; }
 .dough-rows { margin: 0; padding: 0; list-style: none; }
 .drow { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; gap: 10px; align-items: baseline; padding: 10px 0; border-bottom: 1px dashed var(--rule); font-size: 16px; }
 .drow b { font-weight: 600; }
-.pct { justify-self: end; border: 0; background: none; padding: 0; font-size: 13px; color: var(--muted2); text-decoration: underline dotted var(--faint); text-underline-offset: 3px; }
+/* A small number with a big hit area: the padding is taken back by the margin. */
+.pct { justify-self: end; border: 0; background: none; padding: 12px 8px; margin: -12px -8px; font-size: 13px; color: var(--muted2); text-decoration: underline dotted var(--faint); text-underline-offset: 3px; }
 .pct.fixed { text-decoration: none; cursor: default; }
 .pct.tweaked { color: var(--tomato); }
 .tweak { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0 12px; border-bottom: 1px dashed var(--rule); font-size: 14px; color: var(--muted); }
@@ -345,14 +347,17 @@ a:hover { color: #2C4F29; }
 .pick.cur { background: var(--seg); font-weight: 600; }
 .pick .pillv { align-self: center; }
 .pick small { font-size: 13px; color: var(--muted2); font-weight: 400; white-space: nowrap; }
+.pick-all { color: var(--basil); font-weight: 600; }
+.pick-all span { font-size: 20px; line-height: 1; }
+.quick { align-self: flex-start; }
 .sheet-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .sheet-actions .btn { min-height: 46px; }
 .planday { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; min-height: 54px; padding: 8px 14px; border: 0; border-bottom: 1px solid var(--row); background: var(--card); text-align: left; }
 .planday:last-child { border-bottom: 0; }
 .planday.today { background: var(--seg); }
-.planday.today .day-when b { color: var(--tomato); }
+.planday.today .day-when b { color: var(--today); }
 .planday .now { font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
-.planday .now.empty { color: var(--faint); }
+.planday .now.empty { color: var(--muted2); }
 
 /* ---------- Toast and sync ---------- */
 .toast {

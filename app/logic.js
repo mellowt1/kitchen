@@ -430,6 +430,11 @@
   // The nights that bring their own toppings (worker/src/kitchen.js has the same keys).
   const TOPPING_NIGHTS = ['pizza', 'flammkuchen'];
   const NIGHT_NAME = { pizza: 'Pizza night', flammkuchen: 'Flammkuchen' };
+  // A dinner written as just "pizza" (or "pizza night", "homemade pizzas") is a pizza night:
+  // the sheet saves it as one, and older written ones count too. "Pizza at Anna's" stays text.
+  const PIZZA_TEXT_RE = /^(?:home\s?made\s+)?pizzas?(?:\s+night)?[.!]*$/i;
+  const isPizzaText = (t) => PIZZA_TEXT_RE.test(String(t || '').trim());
+  const isPizzaNight = (rec) => !!rec && (rec.kind === 'pizza' || (rec.kind === 'text' && isPizzaText(rec.text)));
 
   const isStaple = (key, byKey) => {
     const r = byKey['staple:' + key];
@@ -447,7 +452,7 @@
         for (const who of PEOPLE) {
           const rec = byKey['day:' + mealId(d.id, who, meal)];
           if (!rec) continue;
-          if (rec.kind === 'pizza') at.pizza.add(d.date);
+          if (isPizzaNight(rec)) at.pizza.add(d.date);
           const said = rec.kind === 'recipe' ? (byKey['recipe:' + rec.recipeId] || {}).title : rec.text;
           if (/flammkuchen/i.test(said || '')) at.flammkuchen.add(d.date);
         }
@@ -567,7 +572,7 @@
     TF, BASE, GF, RES, DOUGH_DEFAULT, TWEAK_STEP, TWEAK_RANGE, doughCalc, grams, ballGrams, pctText, STEPS_NY, STEPS_GF, bakeNote,
     MIX_DAYS, mixDate, pizzaPlan, mixDueToday,
     parseQty, normUnit, amountText, ingredientGroups, scale, itemKey, itemName, sumText, shoppingList,
-    STAPLES, PANTRY, TOPPING_NIGHTS, NIGHT_NAME, isStaple, shortTitle, toppingNights, parseItemLine,
+    STAPLES, PANTRY, TOPPING_NIGHTS, NIGHT_NAME, isPizzaText, isPizzaNight, isStaple, shortTitle, toppingNights, parseItemLine,
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.KitchenLogic = api;

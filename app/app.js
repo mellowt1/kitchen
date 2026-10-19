@@ -136,7 +136,7 @@
     const d = dough();
     if (d.night && d.night >= t) out.add(d.night);
     for (const r of Object.values(db)) {
-      if (r.type === 'day' && r.kind === 'pizza') {
+      if (r.type === 'day' && L.isPizzaNight(r)) {
         const date = L.dateOfDayId(r.id);
         if (date >= t) out.add(date);
       }
@@ -152,7 +152,7 @@
   function dayView(id) {
     const rec = dayRec(id);
     if (!rec) return { title: 'Add ' + id.split(':')[3], cls: 'empty', side: '' };
-    if (rec.kind === 'pizza') {
+    if (L.isPizzaNight(rec)) {
       const n = rec.servings || dough().count;
       return { title: 'Pizza night', cls: 'pizza', side: plural(n, 'pizza', 'pizzas') };
     }
@@ -212,7 +212,8 @@
       const out = st.away.includes(d.date) ? L.PERSON_NAME.paul + ' out' : '';
       const lines = meals.map((m) => {
         const v = dayView(L.mealId(d.id, ui.who, m));
-        return `<span class="meal meal-${m}" data-m="${m}"><span class="meal-name">${named ? L.MEAL_NAME[m] : ''}</span>`
+        // Dinner alone takes the row's full width; the meal names only show beside each other.
+        return `<span class="meal meal-${m}${named ? '' : ' solo'}" data-m="${m}">${named ? `<span class="meal-name">${L.MEAL_NAME[m]}</span>` : ''}`
           + `<span class="meal-what"><span class="day-title${v.cls ? ' ' + v.cls : ''}">${esc(v.title)}</span>${v.veg ? VEG : ''}`
           + `${m === 'dinner' && out ? `<span class="away">${esc(out)}</span>` : ''}</span>`
           + `<span class="day-side"><span class="srv">${esc(v.side)}</span></span></span>`;
@@ -233,6 +234,7 @@
   let sheetOpener = null;
 
   function openSheet(state, html) {
+    if (!undoFn) hideToast(); // a plain note would sit over the sheet; one with Undo stays
     sheet = state;
     sheetOpener = document.activeElement;
     $('sheetBody').innerHTML = html;
@@ -249,12 +251,30 @@
 
   const sheetHead = (label, title) => `<div class="sheet-head"><div class="titles"><span class="label">${esc(label)}</span><h2 id="sheetTitle">${esc(title)}</h2></div><button type="button" class="round" data-close aria-label="Close">×</button></div>`;
 
-  function pickListHtml(curId, q) {
+  // The recipes planned most (any week, either plan), the latest first among equals; the one on
+  // the meal now leads. A week is planned from about ten recipes, so these come before the A to Z.
+  function oftenPicked(curId, n) {
+    const seen = new Map(); // recipeId -> [times, last]
+    for (const r of Object.values(db)) {
+      if (r.type !== 'day' || r.kind !== 'recipe' || !recipe(r.recipeId)) continue;
+      const x = seen.get(r.recipeId) || [0, 0];
+      seen.set(r.recipeId, [x[0] + 1, Math.max(x[1], r.updatedAt || 0)]);
+    }
+    const ids = [...seen].sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]).map(([id]) => id);
+    if (curId && recipe(curId)) ids.unshift(curId);
+    return [...new Set(ids)].slice(0, n).map(recipe);
+  }
+
+  // Under seven recipes, all of them; otherwise the often planned ones and "All N recipes",
+  // and the whole list once asked for or searched.
+  function pickListHtml(curId, q, full) {
     const all = recipes();
     const f = String(q || '').toLowerCase().trim();
-    const list = f ? all.filter((r) => r.title.toLowerCase().includes(f)) : all;
+    const often = !f && !full && all.length > 6 ? oftenPicked(curId, 5) : [];
+    const list = f ? all.filter((r) => r.title.toLowerCase().includes(f)) : often.length ? often : all;
     if (!list.length) return `<p class="empty-note">${all.length ? 'No recipe with that name.' : 'No recipes yet. Add them in Recipes.'}</p>`;
-    return list.map((r) => `<button type="button" class="pick${r.id === curId ? ' cur' : ''}" data-pick="${r.id}"><span>${esc(r.title)}</span>${r.veg ? VEG : r.time ? `<small>${esc(r.time)}</small>` : ''}</button>`).join('');
+    return list.map((r) => `<button type="button" class="pick${r.id === curId ? ' cur' : ''}" data-pick="${r.id}"><span>${esc(r.title)}</span>${r.veg ? VEG : r.time ? `<small>${esc(r.time)}</small>` : ''}</button>`).join('')
+      + (often.length ? `<button type="button" class="pick pick-all" data-allpicks>All ${all.length} recipes<span aria-hidden="true">›</span></button>` : '');
   }
 
   const PLACEHOLDER = { breakfast: 'Overnight oats, toast', lunch: 'Leftovers, a sandwich', dinner: 'Leftovers, dinner at friends' };
@@ -270,22 +290,23 @@
     const rec = dayRec(id);
     const date = L.dateOfDayId(day);
     const r = rec && rec.kind === 'recipe' ? recipe(rec.recipeId) : null;
-    const servings = (rec && rec.servings) || (r && r.servings) || (rec && rec.kind === 'pizza' ? dough().count : meal === 'dinner' ? 2 : 1);
+    const servings = (rec && rec.servings) || (r && r.servings) || (L.isPizzaNight(rec) ? dough().count : meal === 'dinner' ? 2 : 1);
     const many = recipes().length;
     const other = otherOf(who);
     const html = sheetHead(`${L.PERSON_NAME[who]}, ${L.dayName(date)}`, L.dayMonth(date))
       + (showMeals ? `<div class="seg meals" role="radiogroup" aria-label="Meal">${L.MEALS.map((m) => `<button type="button" role="radio" data-meal="${m}" aria-checked="${m === meal}">${L.MEAL_NAME[m]}${m !== meal && dayRec(L.mealId(day, who, m)) ? '<span class="dot" aria-label=", planned"></span>' : ''}</button>`).join('')}</div>` : '')
-      + `<div class="set-row"><span id="srvLabel">${rec && rec.kind === 'pizza' ? 'Pizzas' : 'Servings'}</span><div class="stepper"><button type="button" data-srv="-1" aria-label="Fewer">−</button><span id="srvVal">${servings}</span><button type="button" data-srv="1" aria-label="More">+</button></div></div>`
+      + `<div class="set-row"><span id="srvLabel">${L.isPizzaNight(rec) ? 'Pizzas' : 'Servings'}</span><div class="stepper"><button type="button" data-srv="-1" aria-label="Fewer">−</button><span id="srvVal">${servings}</span><button type="button" data-srv="1" aria-label="More">+</button></div></div>`
       + '<span class="label">Write it</span>'
-      + `<form class="write" id="writeForm" autocomplete="off"><label class="sr" for="writeInput">${L.MEAL_NAME[meal]}</label><input id="writeInput" maxlength="200" enterkeyhint="done" placeholder="${PLACEHOLDER[meal]}" value="${rec && rec.kind === 'text' ? esc(rec.text) : ''}"><button type="submit" class="btn btn-red">Save</button></form>`
+      + `<form class="write" id="writeForm" autocomplete="off"><label class="sr" for="writeInput">${L.MEAL_NAME[meal]}</label><input id="writeInput" maxlength="200" enterkeyhint="done" placeholder="${PLACEHOLDER[meal]}" value="${rec && rec.kind === 'text' && !L.isPizzaText(rec.text) ? esc(rec.text) : ''}"><button type="submit" class="btn btn-red">Save</button></form>`
+      // Pizza night is a dinner they plan most weeks: one tap, above the recipes.
+      + (meal === 'dinner' ? '<button type="button" class="btn btn-soft btn-mid quick" data-act="pizza">Pizza night</button>' : '')
       + '<span class="label">Or pick a recipe</span>'
       + (many > 6 ? '<label class="sr" for="pickFind">Find a recipe</label><input id="pickFind" class="find" type="search" placeholder="Find a recipe" autocomplete="off">' : '')
       + `<div class="card picks" id="picks">${pickListHtml(r && r.id)}</div>`
-      + '<div class="sheet-actions">'
-      + (meal === 'dinner' ? '<button type="button" class="btn btn-soft" data-act="pizza">Pizza night</button>' : '')
-      + (rec ? `<button type="button" class="btn btn-line" data-act="copy">Same for ${L.PERSON_NAME[other]}</button>` : '')
-      + (rec ? `<button type="button" class="btn btn-line" data-act="clear">Clear ${meal}</button>` : '')
-      + '</div>'
+      + (rec ? '<div class="sheet-actions">'
+        + `<button type="button" class="btn btn-line" data-act="copy">Same for ${L.PERSON_NAME[other]}</button>`
+        + `<button type="button" class="btn btn-line" data-act="clear">Clear ${meal}</button>`
+        + '</div>' : '')
       + (showMeals ? '' : '<button type="button" class="quiet" data-act="meals">Breakfast or lunch</button>');
     return { html, state: { kind: 'day', day, meal, id, servings, touched: false, meals: showMeals } };
   }
@@ -322,6 +343,13 @@
       if (rec) saveDay(s.id, { kind: rec.kind, recipeId: rec.recipeId || null, text: rec.text || '', servings: s.servings });
       return;
     }
+    if (e.target.closest('[data-allpicks]')) {
+      const first = recipes().length > 5 ? 5 : 0; // the first recipe that was not on show
+      $('picks').innerHTML = pickListHtml(rec && rec.recipeId, '', true);
+      const b = $('picks').querySelectorAll('.pick')[first];
+      if (b) b.focus({ preventScroll: true });
+      return;
+    }
     const pick = e.target.closest('[data-pick]');
     if (pick) {
       saveDay(s.id, { kind: 'recipe', recipeId: pick.dataset.pick, servings: s.servings });
@@ -339,7 +367,7 @@
       return;
     }
     if (act.dataset.act === 'pizza') {
-      saveDay(s.id, { kind: 'pizza', servings: s.touched || (rec && rec.kind === 'pizza') ? s.servings : dough().count });
+      saveDay(s.id, { kind: 'pizza', servings: s.touched || L.isPizzaNight(rec) ? s.servings : dough().count });
       closeSheet();
     } else if (act.dataset.act === 'copy' && rec) {
       const other = otherOf(ui.who);
@@ -362,7 +390,9 @@
     const text = L.cleanLine($('writeInput').value, 200);
     if (!text) { $('writeInput').focus(); return; }
     const rec = dayRec(s.id);
-    saveDay(s.id, { kind: 'text', text, servings: s.touched || (rec && rec.servings) ? s.servings : null });
+    // Just "pizza" is a pizza night: the dough's reminder and the toppings follow it.
+    if (L.isPizzaText(text)) saveDay(s.id, { kind: 'pizza', servings: s.touched || L.isPizzaNight(rec) ? s.servings : dough().count });
+    else saveDay(s.id, { kind: 'text', text, servings: s.touched || (rec && rec.servings) ? s.servings : null });
     closeSheet();
   }
 
@@ -426,16 +456,17 @@
   }
 
   /* ---------- Shopping ---------- */
-  // A small house: "always in the house", on every line that came from a recipe.
-  const HOUSE = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5"/><path d="M6.5 9.5V19h11V9.5"/></svg>';
   const andList = (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
 
+  // To buy lines carry the dish they are for; Check you have lines carry "Always have" instead
+  // (a staple stops being listed every week), away from the tick on the lines bought every week.
   function shopLineHtml(l, withDishes) {
     const dishes = withDishes && l.dishes.length ? `<small class="sfor">${esc(l.dishes.join(' · '))}</small>` : '';
     return `<div class="srow"><button type="button" class="stick" role="checkbox" aria-checked="${l.on}" data-tick="${esc(l.key)}"><span class="box">${l.on ? '✓' : ''}</span><span class="sname">${esc(l.name)}${dishes}</span><span class="sqty">${esc(l.qty)}</span></button>`
       + (l.extraId
         ? `<button type="button" class="sdel" data-delx="${l.extraId}" aria-label="Remove ${esc(l.name)}">×</button>`
-        : `<button type="button" class="shouse" data-staple="${esc(l.key)}" data-name="${esc(l.name)}" aria-label="Always have ${esc(l.name)} in the house">${HOUSE}</button>`)
+        : withDishes ? ''
+        : `<button type="button" class="always" data-staple="${esc(l.key)}" data-name="${esc(l.name)}" aria-label="Always have ${esc(l.name)}: stop listing it">Always have</button>`)
       + '</div>';
   }
   const aislesHtml = (groups, withDishes) => groups.map((g) => `<div class="aisle"><span class="label">${esc(g.name)}</span>`
@@ -469,7 +500,7 @@
       : '';
     const check = list.check.length || staples
       ? `<details class="sec sec-check" id="checkSec"${ui.checkOpen ? ' open' : ''}><summary class="sec-h">Check you have<span class="sec-n">${list.check.length ? checkLeft || 'Done' : ''}</span></summary>`
-        + (list.check.length ? '<p class="sec-note">Rice, tins, spices and sauces. Tick what is already at home.</p>' : '')
+        + (list.check.length ? '<p class="sec-note">Rice, tins, spices and sauces. Tick what is already at home; Always have stops listing it every week.</p>' : '')
         + aislesHtml(list.check, false) + staples + '</details>'
       : '';
     $('shopList').innerHTML = sum + buy + check;

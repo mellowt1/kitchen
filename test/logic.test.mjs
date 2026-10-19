@@ -295,3 +295,14 @@ test('titles: the Worker gives the same titles', { skip: !existsSync(WORKER) && 
     assert.equal(W.titleCase(s), L.titleCase(s), JSON.stringify(s));
   }
 });
+
+test('a dinner written as just "pizza" is a pizza night; "pizza at Anna\'s" is not', () => {
+  for (const t of ['pizza', 'Pizza', 'pizzas', 'Pizza night', 'homemade pizza', ' pizza! ']) assert.equal(L.isPizzaText(t), true, t);
+  for (const t of ['Pizza at Anna\'s', 'leftover pizza', 'pizza dough', '']) assert.equal(L.isPizzaText(t), false, t);
+  const id = (d, who) => 'day:' + L.mealId('2026-W42:' + d, who, 'dinner');
+  const byKey = {
+    [id('fri', 'olivia')]: { type: 'day', kind: 'text', text: 'pizza' },
+    [id('sat', 'olivia')]: { type: 'day', kind: 'text', text: 'Pizza at Anna\'s' },
+  };
+  assert.deepEqual(L.toppingNights('2026-W42', byKey), { pizza: 1, flammkuchen: 0 });
+});
