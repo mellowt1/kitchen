@@ -4,24 +4,24 @@
  * shopping is one long receipt. Phone first; from 900px the week and the receipt sit side by side. */
 
 :root {
-  --ground: #E7E9EC;      /* the steel counter */
+  --ground: #F1F2F0;      /* the steel counter, wiped down: light and a touch warm */
   --paper: #FFFFFF;       /* tickets */
   --card: #FFFFFF;
-  --ink: #141518;
-  --muted: #50565D;
-  --muted2: #5E656C;      /* small text: 4.8:1 on the counter */
+  --ink: #2A2E33;         /* soft graphite, not black */
+  --muted: #565C62;
+  --muted2: #62686E;      /* small text: 5:1 on the counter */
   --faint: #868D95;       /* lines and boxes: 3:1 on paper */
-  --rule: #D3D7DB;
-  --row: #E6E8EB;
-  --dash: #C3C8CD;
-  --seg: #D9DDE1;
-  --steel: #3A3F45;
-  --steel-ink: #5B6168;
-  --tomato: #C8231C;      /* ticket red */
-  --tomato-bg: #FBE5E2;
-  --tomato-ink: #8E1A14;
-  --tomato-line: #EBB7B1;
-  --today: #C8231C;
+  --rule: #DADDE0;
+  --row: #EBEDEE;
+  --dash: #CDD1D4;
+  --seg: #E3E6E8;
+  --steel: #4A5157;
+  --steel-ink: #62686E;
+  --tomato: #D23A2F;      /* ticket red, a little warmer */
+  --tomato-bg: #FCEAE6;
+  --tomato-ink: #9A3A2E;
+  --tomato-line: #F0C2BB;
+  --today: #D23A2F;
   --basil: #2F6B3A;
   --basil-bg: #E2EEE3;
   --sans: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -101,9 +101,9 @@ a:hover { color: #1F4A27; }
 .tab.on::before { content: ''; position: absolute; top: -6px; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: var(--tomato); }
 
 /* ---------- Week: tickets on the rail ---------- */
-.banner { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 4px; background: var(--ink); color: #fff; font-size: 15px; line-height: 1.35; }
-.banner .ico { color: #FF8A7E; }
-.banner b { font-weight: 800; font-stretch: var(--semi); text-transform: uppercase; letter-spacing: .03em; color: #FF8A7E; }
+.banner { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 4px; background: var(--tomato-bg); color: var(--tomato-ink); font-size: 15px; line-height: 1.35; }
+.banner .ico { color: var(--tomato); }
+.banner b { font-weight: 800; font-stretch: var(--semi); text-transform: uppercase; letter-spacing: .03em; color: var(--tomato); }
 .seg.who { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 .seg .dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 999px; background: var(--tomato); vertical-align: middle; }
 .seg.meals { margin: 0; }
@@ -112,10 +112,10 @@ a:hover { color: #1F4A27; }
 /* The ticket rail: a steel bar the first row of tickets tucks under. */
 .rail {
   position: relative; z-index: 2; height: 16px; margin: 0 -8px; border-radius: 4px;
-  background: linear-gradient(#E3E6E9, #A9B0B6 40%, #6E747B 58%, #A3A9AF 80%, #CDD1D5);
-  box-shadow: 0 2px 3px rgba(20, 21, 24, .28), inset 0 1px 0 rgba(255, 255, 255, .7);
+  background: linear-gradient(#F3F4F5, #CBD0D4 40%, #9DA4AB 58%, #C4C9CE 80%, #E4E7E9);
+  box-shadow: 0 2px 3px rgba(42, 46, 51, .18), inset 0 1px 0 rgba(255, 255, 255, .8);
 }
-.tickets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; margin-top: -7px; filter: drop-shadow(0 1px 1px rgba(20, 21, 24, .16)) drop-shadow(0 3px 6px rgba(20, 21, 24, .07)); }
+.tickets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; margin-top: -7px; filter: drop-shadow(0 1px 1px rgba(42, 46, 51, .12)) drop-shadow(0 3px 8px rgba(42, 46, 51, .06)); }
 .day {
   position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 128px;
   padding: 16px 12px calc(12px + var(--zz) / 2); border: 0; background: var(--paper); text-align: left;
@@ -141,16 +141,16 @@ a:hover { color: #1F4A27; }
 .day-side { font-size: 14px; font-weight: 700; font-stretch: var(--narrow); color: var(--muted2); white-space: nowrap; }
 .away { align-self: flex-start; font-size: 11px; font-weight: 800; font-stretch: var(--semi); letter-spacing: .06em; text-transform: uppercase; color: var(--tomato); border: 1.5px solid currentColor; border-radius: 3px; padding: 0 5px; white-space: nowrap; }
 /* An empty day is an empty clip on the rail: no paper yet. */
-.day.empty { background: transparent; border: 2px dashed #A6ACB2; -webkit-mask: none; mask: none; }
+.day.empty { background: transparent; border: 2px dashed #BCC1C6; -webkit-mask: none; mask: none; }
 .day.empty .day-when { border-bottom-color: transparent; }
 .day.empty .day-title::before { content: '+ '; }
 /* The eighth slot: the week's total, a dark check that opens Shopping. */
 .tk-total {
   display: flex; flex-direction: column; justify-content: space-between; gap: 10px; min-height: 128px; padding: 14px 12px;
-  border: 0; border-radius: 4px; background: var(--steel); color: #fff; text-align: left;
+  border: 0; border-radius: 4px; background: var(--tomato-bg); color: var(--tomato-ink); text-align: left;
 }
-.tk-total b { font-size: 38px; font-weight: 800; font-stretch: var(--narrow); line-height: .9; }
-.tk-total small { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #C9CDD2; }
+.tk-total b { font-size: 38px; font-weight: 800; font-stretch: var(--narrow); line-height: .9; color: var(--tomato); }
+.tk-total small { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tomato-ink); }
 .tk-go { font-size: 15px; font-weight: 600; }
 .tk-go::after { content: ' ›'; }
 
@@ -166,7 +166,7 @@ a:hover { color: #1F4A27; }
 }
 .add input { flex-grow: 1; min-width: 0; min-height: 40px; border: 0; background: none; font-size: 16px; padding: 8px 0; outline: none; }
 .add input::placeholder { color: var(--muted2); }
-.add-btn { width: 44px; height: 44px; border: 0; border-radius: 9px; background: var(--ink); color: #fff; font-size: 24px; line-height: 1; padding: 0; flex-shrink: 0; }
+.add-btn { width: 44px; height: 44px; border: 0; border-radius: 9px; background: var(--tomato); color: #fff; font-size: 24px; line-height: 1; padding: 0; flex-shrink: 0; }
 .shop-list { display: flex; flex-direction: column; gap: 14px; padding: 18px 16px calc(22px + var(--zz) / 2); background: var(--paper); }
 .shop-list:has(> .empty-note:only-child) { background: transparent; padding: 0; -webkit-mask: none; mask: none; }
 .aisle { display: flex; flex-direction: column; }
@@ -177,7 +177,7 @@ a:hover { color: #1F4A27; }
   min-height: 50px; padding: 0; border: 0; background: none; text-align: left; font-size: 16px;
 }
 .box {
-  width: 22px; height: 22px; border-radius: 4px; border: 2px solid var(--ink); background: transparent;
+  width: 22px; height: 22px; border-radius: 4px; border: 2px solid #7A8087; background: transparent;
   display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 800;
 }
 .stick[aria-checked="true"] .box { border-color: var(--basil); background: var(--basil); }
@@ -190,13 +190,13 @@ a:hover { color: #1F4A27; }
 .sname small.sfor { display: block; margin-top: 1px; font-size: 13px; font-weight: 400; color: var(--muted2); }
 .stick[aria-checked="true"] .sfor { text-decoration: none; color: var(--faint); }
 /* The receipt's head: what the order is for. */
-.shop-sum { margin: 0 0 2px; padding: 0 0 14px; border-bottom: 2px solid var(--ink); font-size: 15px; line-height: 1.45; color: var(--muted); }
+.shop-sum { margin: 0 0 2px; padding: 0 0 14px; border-bottom: 2px dashed var(--dash); font-size: 15px; line-height: 1.45; color: var(--muted); }
 .shop-sum b { font-weight: 700; color: var(--ink); }
 .sum-n { display: block; font-size: 22px; font-weight: 800; font-stretch: var(--narrow); letter-spacing: .01em; text-transform: uppercase; color: var(--ink); margin-bottom: 2px; }
 .sec { display: flex; flex-direction: column; gap: 14px; }
 .sec-h { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 -6px; font-weight: 800; font-stretch: var(--narrow); text-transform: uppercase; font-size: 26px; line-height: 1; color: var(--ink); }
 .sec-n { font-size: 16px; font-weight: 800; color: var(--tomato); }
-.sec-check { padding-top: 8px; border-top: 2px solid var(--ink); }
+.sec-check { padding-top: 8px; border-top: 2px dashed var(--dash); }
 .sec-check > summary { list-style: none; cursor: pointer; min-height: 44px; align-items: center; margin: 0; }
 .sec-check > summary::-webkit-details-marker { display: none; }
 .sec-check > summary::after { content: '›'; margin-left: auto; font-size: 26px; font-weight: 400; color: var(--muted2); transition: transform 220ms cubic-bezier(.2, .8, .2, 1); }
@@ -211,7 +211,7 @@ a:hover { color: #1F4A27; }
 /* ---------- Buttons ---------- */
 .btn { min-height: 50px; padding: 0 22px; border-radius: 12px; font-size: 16px; font-weight: 700; border: 0; }
 .btn-red { background: var(--tomato); color: #fff; }
-.btn-ink { background: var(--ink); color: #fff; }
+.btn-ink { background: var(--steel); color: #fff; }
 .btn-line { background: var(--paper); border: 1px solid var(--rule); color: var(--ink); font-weight: 600; }
 .btn-soft { background: var(--paper); border: 1.5px solid var(--tomato); color: var(--tomato-ink); }
 .btn-small { min-height: 44px; padding: 0 16px; font-size: 15px; }
@@ -222,7 +222,7 @@ a:hover { color: #1F4A27; }
 
 /* ---------- Recipes ---------- */
 #recipesHome { display: flex; flex-direction: column; gap: 16px; }
-.round-ink { background: var(--ink); color: #fff; border-color: var(--ink); }
+.round-ink { background: var(--tomato); color: #fff; border-color: var(--tomato); }
 .round-ink .ico, .search .ico { stroke-width: 2; }
 /* The day sheet's recipe picker keeps .find; this is the Recipes tab's own search. */
 .find { flex-grow: 1; min-width: 0; min-height: 44px; padding: 0 14px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper); font-size: 16px; }
@@ -277,7 +277,7 @@ a:hover { color: #1F4A27; }
 .rcard { display: flex; flex-direction: column; gap: 10px; padding: 22px 18px calc(26px + var(--zz) / 2); background: var(--paper); }
 .rcard h1 { margin: 0 0 4px; font-weight: 800; font-stretch: var(--narrow); font-size: 40px; line-height: .95; text-transform: uppercase; overflow-wrap: anywhere; }
 .h1-sub { margin: -6px 0 4px; font-size: 16px; font-weight: 600; color: var(--muted); }
-.rmeta-row { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid var(--ink); font-size: 15px; font-weight: 600; color: var(--muted); flex-wrap: wrap; }
+.rmeta-row { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 2px dashed var(--dash); font-size: 15px; font-weight: 600; color: var(--muted); flex-wrap: wrap; }
 .stepper { display: inline-flex; align-items: center; gap: 4px; background: var(--seg); border-radius: 12px; padding: 1px; flex-shrink: 0; }
 .stepper button { width: 42px; height: 42px; border: 0; border-radius: 11px; background: none; font-size: 22px; color: var(--ink); padding: 0; }
 .stepper span { min-width: 24px; text-align: center; font-size: 18px; font-weight: 800; font-stretch: var(--narrow); color: var(--ink); }
@@ -296,7 +296,7 @@ a:hover { color: #1F4A27; }
 
 /* Cook: one step fills the screen, swipe up for the next; the screen stays awake. */
 .cook { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--paper); }
-.cook-top { display: flex; align-items: center; gap: 12px; padding: calc(10px + var(--safe-t)) 16px 10px; border-bottom: 2px solid var(--ink); }
+.cook-top { display: flex; align-items: center; gap: 12px; padding: calc(10px + var(--safe-t)) 16px 10px; border-bottom: 1.5px solid var(--rule); }
 .cook-title { flex-grow: 1; min-width: 0; font-size: 16px; font-weight: 800; font-stretch: var(--narrow); text-transform: uppercase; letter-spacing: .03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cook-at { font-size: 15px; font-weight: 800; font-stretch: var(--narrow); color: var(--tomato); white-space: nowrap; }
 .cook-pages { flex-grow: 1; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
@@ -378,7 +378,7 @@ a:hover { color: #1F4A27; }
 
 /* ---------- Sheet ---------- */
 .sheet-wrap { position: fixed; inset: 0; z-index: 40; }
-.scrim { position: absolute; inset: 0; background: rgba(20, 21, 24, .4); }
+.scrim { position: absolute; inset: 0; background: rgba(42, 46, 51, .32); }
 .sheet {
   position: absolute; left: 0; right: 0; bottom: 0; max-height: 88vh; max-height: 88dvh; overflow: auto;
   background: var(--paper); border-radius: 16px 16px 0 0; padding: 20px 18px calc(20px + var(--safe-b));

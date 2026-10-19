@@ -806,8 +806,9 @@
       + (r.notes ? `<span class="label">Notes</span><p class="notes">${esc(r.notes)}</p>` : '')
       + '</div>'
       + '<div class="actions">'
-      + (r.steps.length ? '<button type="button" class="btn btn-ink grow" data-cook>Cook</button>' : '')
-      + '<button type="button" class="btn btn-red grow" data-planit>Plan it</button><button type="button" class="btn btn-line" data-edit>Edit</button></div>'
+      + (r.steps.length ? '<button type="button" class="btn btn-red grow" data-cook>Cook</button>' : '')
+      + `<button type="button" class="btn ${r.steps.length ? 'btn-soft' : 'btn-red'} grow" data-planit>Plan it</button>`
+      + '<button type="button" class="btn btn-line" data-edit>Edit</button></div>'
       + (confirmDelete
         ? `<div class="confirm" role="alert"><span>Delete ${esc(r.title)} for good? Days it is planned on keep its name.</span><div class="actions"><button type="button" class="btn btn-red grow" data-delyes>Delete</button><button type="button" class="btn btn-line" data-delno>Keep it</button></div></div>`
         : '<button type="button" class="link-red" data-del>Delete this recipe</button>')
